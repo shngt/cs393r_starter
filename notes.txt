@@ -1,0 +1,11 @@
+ssh -L 10272:localhost:10272 luisamao@robodata.csres.utexas.edu
+cd ~/ut_automata
+./bin/websocket
+
+cd ~/ut_automata
+python3 -m http.server 8080
+
+cd ~/ut_automata
+./bin/simulator --localize
+
+./bin/navigation
