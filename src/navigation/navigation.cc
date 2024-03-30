@@ -35,6 +35,7 @@
 #include "visualization/visualization.h"
 #include "path_options.h"
 #include "latency_compensation.h"
+#include "global_planner.h"
 
 using Eigen::Vector2f;
 using amrl_msgs::AckermannCurvatureDriveMsg;
@@ -72,7 +73,8 @@ Navigation::Navigation(const string& map_name, ros::NodeHandle* n) :
     nav_complete_(true),
     nav_goal_loc_(0, 0),
     nav_goal_angle_(0),
-    latency_compensation_(new LatencyCompensation(0, 0, 0)) 
+    nav_path_(vector<Vector2f>({Vector2f(0, 0), Vector2f(0, 0)})),
+    latency_compensation_(new LatencyCompensation(0, 0, 0))
   {
   map_.Load(GetMapFileFromName(map_name));
   drive_pub_ = n->advertise<AckermannCurvatureDriveMsg>(
@@ -86,6 +88,17 @@ Navigation::Navigation(const string& map_name, ros::NodeHandle* n) :
 }
 
 void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
+  // visualization::ClearVisualizationMsg(local_viz_msg_);
+  printf("Current position is (%f, %f) angle %f\n", robot_loc_.x(), robot_loc_.y(), robot_angle_);
+  printf("Setting navigation goal to (%f, %f) angle %f\n", loc.x(), loc.y(), angle);
+  // Clear previous path
+  nav_path_.clear();
+  nav_goal_loc_ = loc;
+  nav_goal_angle_ = angle;
+  nav_complete_ = false;
+  PlanPath(robot_loc_, nav_goal_loc_, map_, nav_path_);
+  // Visualize the path
+  cout << nav_path_.size() << endl;
 }
 
 void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
@@ -185,6 +198,12 @@ void Navigation::Run() {
   
     
   visualization::DrawPoint(Vector2f(0, 1/path_options[best_path].curvature), 0x0000FF, local_viz_msg_);
+
+  for (size_t i = 0; i < nav_path_.size() - 1; i++) {
+    visualization::DrawPoint(nav_path_[i], 0xFF00FF, global_viz_msg_);
+    visualization::DrawPoint(nav_path_[i + 1], 0xFF00FF, global_viz_msg_);
+    visualization::DrawLine(nav_path_[i], nav_path_[i + 1], 0xFFA500, global_viz_msg_);
+  }
 
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();
