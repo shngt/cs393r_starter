@@ -50,20 +50,20 @@ void PlanPath(const Vector2f& start, const Vector2f& goal, VectorMap& map_, vect
     // Frontier vertices
     priority_queue<pair<float, Vector2f>, vector<pair<float, Vector2f>>, PairFloatVector2fComparator> frontier;
     
-    // Round start and goal to nearest 0.25 meters
-    Vector2f rounded_start, rounded_goal;
-    rounded_start = {round(start[0] * 4) / 4, round(start[1] * 4) / 4};
-    rounded_goal = {round(goal[0] * 4) / 4, round(goal[1] * 4) / 4};
+    // // Round start and goal to nearest 0.25 meters
+    // Vector2f rounded_start, rounded_goal;
+    // rounded_start = {round(start[0] * 4) / 4, round(start[1] * 4) / 4};
+    // rounded_goal = {round(goal[0] * 4) / 4, round(goal[1] * 4) / 4};
 
     // Parent of start
-    parent[rounded_start] = start;
+    parent[start] = start;
     // Cost of start
-    cost[rounded_start] = 0;
+    cost[start] = 0;
 
     // A* path planning from start to goal
     // frontier.push({(rounded_goal - rounded_start).norm(), rounded_start});
     // int T = 2;
-    frontier.push({0, rounded_start});
+    frontier.push({0, start});
     while (!frontier.empty()) {
         Vector2f current = frontier.top().second;
         frontier.pop();
@@ -72,8 +72,8 @@ void PlanPath(const Vector2f& start, const Vector2f& goal, VectorMap& map_, vect
         // }
         // Print current
         // std::cout << "Current: " << current[0] << ", " << current[1] << std::endl;
-        if ((current - rounded_goal).norm() < 1e-6) {
-            path.push_back(rounded_goal);
+        if ((current - goal).norm() < 1e-6) {
+            path.push_back(goal);
             break;
         }
         for (int i = -1; i <= 1; i++) {
@@ -103,15 +103,15 @@ void PlanPath(const Vector2f& start, const Vector2f& goal, VectorMap& map_, vect
                 if (cost.find(neighbor) == cost.end() || new_cost < cost[neighbor]) {
                     cost[neighbor] = new_cost;
                     parent[neighbor] = current;
-                    frontier.push({new_cost + (neighbor - rounded_goal).norm(), neighbor});
+                    frontier.push({new_cost + (neighbor - goal).norm(), neighbor});
                 }
             }
         }
     }
 
     // Reconstruct path
-    Vector2f current = rounded_goal;
-    while (current != rounded_start) {
+    Vector2f current = goal;
+    while (current != start) {
         path.push_back(current);
         current = parent[current];
     }

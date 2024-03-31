@@ -97,8 +97,6 @@ void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
   nav_goal_angle_ = angle;
   nav_complete_ = false;
   PlanPath(robot_loc_, nav_goal_loc_, map_, nav_path_);
-  // Visualize the path
-  cout << nav_path_.size() << endl;
 }
 
 void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
@@ -172,6 +170,13 @@ void Navigation::Run() {
   // distance_traveled_ += current_speed * robot_config_.dt;
   // float dist_to_go = (10 - distance_traveled_); // hard code to make it go 10 forward
   // float cmd_vel = run1DTimeOptimalControl(dist_to_go, current_speed, robot_config_);
+
+  // Check whether new navigation plan is needed based on goal
+  if (nav_complete_) {
+    return;
+  }
+
+
 
   vector<PathOption> path_options = samplePathOptions(31, point_cloud_, robot_config_);
   int best_path = selectPath(path_options);
