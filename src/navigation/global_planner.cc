@@ -72,7 +72,9 @@ void PlanPath(const Vector2f& start, const Vector2f& goal, VectorMap& map_, vect
         // }
         // Print current
         // std::cout << "Current: " << current[0] << ", " << current[1] << std::endl;
-        if ((current - goal).norm() < 1e-6) {
+        // Check if L-inf distance from current to goal is less than 0.125
+        if (max(abs(current[0] - goal[0]), abs(current[1] - goal[1])) <= 0.125) {
+            path.push_back(current);
             path.push_back(goal);
             break;
         }
