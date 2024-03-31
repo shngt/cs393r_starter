@@ -165,25 +165,90 @@ void Navigation::Run() {
   // Eventually, you will have to set the control values to issue drive commands:
   // drive_msg_.curvature = ...;
   // drive_msg_.velocity = ...;
-  float current_speed = robot_vel_.norm();
   // cout << current_speed << endl;
   // distance_traveled_ += current_speed * robot_config_.dt;
   // float dist_to_go = (10 - distance_traveled_); // hard code to make it go 10 forward
   // float cmd_vel = run1DTimeOptimalControl(dist_to_go, current_speed, robot_config_);
 
   // Check whether new navigation plan is needed based on goal
+  // if (nav_complete_) {
+  //   return;
+  // }
+
+  // Check if the robot is within a certain distance of the goal
+  if ((nav_goal_loc_ - robot_loc_).norm() < 0.1) {
+    printf("Navigation complete\n");
+    nav_complete_ = true;
+  }
+
+  // If navigation is complete, stop the robot
   if (nav_complete_) {
+    drive_msg_.velocity = 0;
+    drive_msg_.curvature = 0;
+    drive_pub_.publish(drive_msg_);
     return;
   }
 
+  // Go through edges in reverse and check if the robot is within a certain distance of the edge
+  bool on_path = false;
+  for (size_t i = nav_path_.size() - 1; i > 0; i--) {
+    Vector2f edge_start = nav_path_[i - 1];
+    Vector2f edge_end = nav_path_[i];
+    Vector2f projected_point = geometry::ProjectPointOntoLineSegment(robot_loc_, edge_start, edge_end);
+    float dist = (projected_point - robot_loc_).norm();
+    if (dist < 0.1) {
+      on_path = true;
+      break;
+    }
+  }
 
+  // If the robot is not on the path, replan
+  nav_path_.clear();
+  if (!on_path) {
+    PlanPath(robot_loc_, nav_goal_loc_, map_, nav_path_);
+  }
 
-  vector<PathOption> path_options = samplePathOptions(31, point_cloud_, robot_config_);
-  int best_path = selectPath(path_options);
+  // Set circle radius for carrot following
+  float carrot_radius = 0.5;
+  visualization::DrawArc(robot_loc_, carrot_radius, 0, M_2PI, 0xFF0000, global_viz_msg_);
+  Vector2f carrot_point = Vector2f(INFINITY, INFINITY);
+  Vector2f carrot_point_robot = Vector2f(INFINITY, INFINITY);
+  // Find point on path which intersects with circle
+  for (size_t i = 0; i < nav_path_.size() - 1; i++) {
+    Vector2f edge_start = nav_path_[i];
+    Vector2f edge_end = nav_path_[i + 1];
+    float carrot_distance = INFINITY;
+    if (geometry::FurthestFreePointCircle(edge_start, edge_end, robot_loc_, carrot_radius, &carrot_distance, &carrot_point)) {
+      // World to local frame transformation
+      visualization::DrawCross(carrot_point, 0.1, 0xFF0000, global_viz_msg_);
+      Eigen::Matrix3f world_T_local = Eigen::Matrix3f::Identity();
+      world_T_local.block<2, 1>(0, 2) = robot_loc_;
+      world_T_local.block<2, 2>(0, 0) << cos(robot_angle_), sin(robot_angle_), -sin(robot_angle_), cos(robot_angle_);
+      carrot_point_robot = world_T_local.block<2, 2>(0, 0) * (carrot_point - robot_loc_);
+      visualization::DrawCross(carrot_point_robot, 0.1, 0x00FF00, local_viz_msg_);
+      break;
+      // Transform carrot point to robot frame
+      // float carrot_point_robot_frame_x = carrot_point.x() * cos(robot_angle_) + carrot_point.y() * sin(robot_angle_) - robot_loc_.x();
+      // float carrot_point_robot_frame_y = -1 * carrot_point.x() * sin(robot_angle_) + carrot_point.y() * cos(robot_angle_) - robot_loc_.y();
+    }
+    // Vector2f closest_point = geometry::ProjectPointOntoLineSegment(robot_loc_, edge_start, edge_end);
+    // float dist = (closest_point - robot_loc_).norm();
+    // if (dist > carrot_distance) {
+    //   Vector2f direction = (closest_point - robot_loc_).normalized();
+    //   Vector2f carrot_point = robot_loc_ + carrot_distance * direction;
+    //   nav_path_.insert(nav_path_.begin() + i + 1, carrot_point);
+    //   break;
+    // }
+  }
+
+  float current_speed = robot_vel_.norm();
+
+  vector<PathOption> path_options = samplePathOptions(61, point_cloud_, robot_config_);
+  int best_path = selectPath(path_options, carrot_point_robot);
 
   drive_msg_.curvature = path_options[best_path].curvature;
   drive_msg_.velocity = run1DTimeOptimalControl(path_options[best_path].free_path_length, current_speed, robot_config_);
-	
+	printf("Curvature: %f, Velocity: %f\n", drive_msg_.curvature, drive_msg_.velocity);
   // cout << drive_msg_.curvature << " " << drive_msg_.velocity << endl;
 
   // visualization here

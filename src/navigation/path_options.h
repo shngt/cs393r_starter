@@ -18,6 +18,6 @@ vector<navigation::PathOption> samplePathOptions(int num_options,
                                                     const vector<Eigen::Vector2f>& point_cloud,
                                                     const navigation::NavigationParams& robot_config);
 
-int selectPath(const vector<navigation::PathOption>& path_options);
+int selectPath(const vector<navigation::PathOption>& path_options, const Vector2f& carrot_point);
 
 #endif  // PATH_OPTIONS_H

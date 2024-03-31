@@ -163,25 +163,34 @@ vector<navigation::PathOption> samplePathOptions(int num_options,
     return path_options;
 }
 
-
 float score(float free_path_length, float curvature, float clearance) {
-    const float w1 = 1;
+    const float w1 = 0.5;
     const float w2 = 0;
-    const float w3 = 0.1;
+    const float w3 = 0.2;
     return w1 * free_path_length + w2 * abs(1/curvature) + w3 * clearance;
 }
 
 // returns the index of the selected path
 // for now, just return the index of the path with the longest free path length
 // if there are multiple paths with the same free path length, return the one with the smallest curvature
-int selectPath(const vector<navigation::PathOption>& path_options) {
+int selectPath(const vector<navigation::PathOption>& path_options, const Vector2f& carrot_point) {
     int selected_path = 0;
-    float best_score = 0;
+    printf("--------------\n");
+    printf("Carrot Point: %f, %f\n", carrot_point[0], carrot_point[1]);
+    float best_score = INFINITY;
+    // float distance_from_carrot = geometry::
     for (unsigned int i = 0; i < path_options.size(); i++) {
-        float s = score(path_options[i].free_path_length, path_options[i].curvature, path_options[i].clearance);
-        if (s > best_score) {
+        float path_curvature = path_options[i].curvature;
+        Vector2f c = Vector2f(0, 1 / path_curvature);
+        // printf("Curvature point: %f, %f\n", c[0], c[1]);
+        float carrot_r = (c - carrot_point).norm();
+        float carrot_path_distance = abs(carrot_r - abs(1 / path_curvature));
+        // printf("Carrot Path Distance: %f\n", carrot_path_distance);
+        float s = -score(path_options[i].free_path_length, path_curvature, path_options[i].clearance) + 5 * carrot_path_distance;
+        if (s < best_score) {
             best_score = s;
             selected_path = i;
+            // printf("Best Score so far: %f at curvature: %f\n", best_score, path_curvature);
         }
     }
     return selected_path;

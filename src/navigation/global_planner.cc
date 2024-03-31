@@ -39,14 +39,6 @@ void PlanPath(const Vector2f& start, const Vector2f& goal, VectorMap& map_, vect
     // Cost map
     unordered_map<Vector2f, float> cost;
 
-    // // Add a dummy value to parent
-    // parent[goal] = start;
-    // // Check if goal is in map
-    // if (parent.find(goal) == parent.end()) {
-    //     std::cout << "Goal not in map" << std::endl;
-    //     return;
-    // }
-
     // Frontier vertices
     priority_queue<pair<float, Vector2f>, vector<pair<float, Vector2f>>, PairFloatVector2fComparator> frontier;
     
@@ -61,7 +53,6 @@ void PlanPath(const Vector2f& start, const Vector2f& goal, VectorMap& map_, vect
     cost[start] = 0;
 
     // A* path planning from start to goal
-    // frontier.push({(rounded_goal - rounded_start).norm(), rounded_start});
     // int T = 2;
     frontier.push({0, start});
     while (!frontier.empty()) {
@@ -73,8 +64,10 @@ void PlanPath(const Vector2f& start, const Vector2f& goal, VectorMap& map_, vect
         // Print current
         // std::cout << "Current: " << current[0] << ", " << current[1] << std::endl;
         // Check if L-inf distance from current to goal is less than 0.125
-        if (max(abs(current[0] - goal[0]), abs(current[1] - goal[1])) <= 0.125) {
+        if (std::max(abs(current[0] - goal[0]), std::abs(current[1] - goal[1])) <= 0.125) {
             path.push_back(current);
+            parent[goal] = current;
+            cost[goal] = cost[current] + (goal - current).norm();
             path.push_back(goal);
             break;
         }
@@ -110,6 +103,7 @@ void PlanPath(const Vector2f& start, const Vector2f& goal, VectorMap& map_, vect
             }
         }
     }
+    std::cout << "Path planned" << std::endl;
 
     // Reconstruct path
     Vector2f current = goal;
@@ -118,5 +112,5 @@ void PlanPath(const Vector2f& start, const Vector2f& goal, VectorMap& map_, vect
         current = parent[current];
     }
 
-    std::cout << "Path planned" << std::endl;
+    std::cout << "Path reconstructed" << std::endl;
 }

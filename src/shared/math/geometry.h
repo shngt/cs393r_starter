@@ -306,7 +306,7 @@ void ProjectPointOntoLineSegment(const Eigen::Matrix<T, 2, 1>& point,
 
   // Project the point onto the line segment, capping it at the two end points
   float scalar_projection =
-      point_vector.dot(line_segment) / line_segment.squaredNorm();
+      point_vector.dot(line_segment) / (line_segment.squaredNorm());
 
   scalar_projection = std::max<T>(T(0), std::min<T>(T(1), scalar_projection));
 
