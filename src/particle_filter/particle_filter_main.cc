@@ -87,7 +87,6 @@ ros::Publisher visualization_publisher_;
 ros::Publisher localization_publisher_;
 ros::Publisher laser_publisher_;
 VisualizationMsg vis_msg_;
-VisualizationMsg local_viz_msg_;
 amrl_msgs::Localization2DMsg localization_msg_;
 sensor_msgs::LaserScan last_laser_msg_;
 
@@ -100,7 +99,6 @@ void InitializeMsgs() {
   header.seq = 0;
   localization_msg_.header = header;
   vis_msg_ = visualization::NewVisualizationMessage("map", "particle_filter");
-  local_viz_msg_ = visualization::NewVisualizationMessage("base_link", "local_particle_filter");
 }
 
 void PublishParticles() {
@@ -112,8 +110,7 @@ void PublishParticles() {
 }
 
 void PublishPredictedScan() {
-  // const uint32_t kColor = 0xd67d00;
-  const uint32_t kColor = 0x00ff00;
+  const uint32_t kColor = 0xA020F0;
   Vector2f robot_loc(0, 0);
   float robot_angle(0);
   particle_filter_.GetLocation(&robot_loc, &robot_angle);
@@ -130,23 +127,6 @@ void PublishPredictedScan() {
   for (const Vector2f& p : predicted_scan) {
     DrawPoint(p, kColor, vis_msg_);
   }
-}
-
-void PublishScan(){
-  // publish every 10th ray of prev laser scan
-  vector<float> ranges = last_laser_msg_.ranges;
-  float min_angle = last_laser_msg_.angle_min;
-  float angle_increment = (last_laser_msg_.angle_max - last_laser_msg_.angle_min)/(ranges.size());
-  for (size_t i = 0; i < ranges.size(); i+=10) {
-    float angle = min_angle + i * angle_increment;
-    if (ranges[i] >= last_laser_msg_.range_max || ranges[i] <= last_laser_msg_.range_min) {
-      continue;
-    }
-    Vector2f p = Vector2f(ranges[i] * cos(angle) + particle_filter_.laser_offset,
-                ranges[i] * sin(angle));
-    DrawPoint(p, 0x800080, local_viz_msg_);
-  }
-
 }
 
 void PublishTrajectory() {
@@ -182,17 +162,11 @@ void PublishVisualization() {
   vis_msg_.header.stamp = ros::Time::now();
   ClearVisualizationMsg(vis_msg_);
 
-  local_viz_msg_.header.stamp = ros::Time::now();
-  ClearVisualizationMsg(local_viz_msg_);
-
   PublishParticles();
   PublishPredictedScan();
   PublishTrajectory();
-  PublishScan();
   visualization_publisher_.publish(vis_msg_);
-  visualization_publisher_.publish(local_viz_msg_);
 }
-
 
 void LaserCallback(const sensor_msgs::LaserScan& msg) {
   if (FLAGS_v > 0) {

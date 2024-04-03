@@ -39,23 +39,6 @@ struct Particle {
   double weight;
 };
 
-// hard coding here for now, will be replaced by a config file
-struct ParticleFilterParams {
-  // Number of particles to use.
-  int num_particles = 60;
-  // coeffs for the motion model
-  float k1 = 0.5; // translation error from translation coeff
-  float k2 = 0.5; // rotation error from translation coeff
-  float k3 = 0.5; // translation error from rotation coeff
-  float k4 = 0.5; // rotation error from rotation coeff
-  // Standard deviation of the observation model.
-  float observation_model_stddev = .1;
-  float observation_model_gamma = .009;
-
-  float d_short = .5;
-  float d_long = 1;
-};
-
 class ParticleFilter {
  public:
   // Default Constructor.
@@ -104,15 +87,10 @@ class ParticleFilter {
                               float angle_max,
                               std::vector<Eigen::Vector2f>* scan);
 
-  // for debugging
-  float laser_offset = 0.2;
  private:
 
   // List of particles being tracked.
   std::vector<Particle> particles_;
-
-  // Parameters for the particle filter.
-  ParticleFilterParams params_;
 
   // Map of the environment.
   vector_map::VectorMap map_;
@@ -125,10 +103,31 @@ class ParticleFilter {
   float prev_odom_angle_;
   bool odom_initialized_;
 
-  const int GAUSSIAN_DIST_COEFF = 1/(params_.observation_model_stddev*sqrt(2*M_PI));
+  // Last loc and angle values used in update step,
+  Eigen::Vector2f last_update_loc_;
+  float last_update_angle_;
+
+  // Resampling skips count
+  int resampling_skipped_;
+
+
+  const float NUM_PARTICLES_;
+  const float INIT_ANGLE_STDDEV_;
+  const float INIT_LOC_STDDEV_;
+  const float K1_;
+  const float K2_;
+  const float K3_;
+  const float K4_;
+  const float LASER_LOC_;
+  const float LASER_SAMPLE_FREQ_;
+  const float GAMMA_;
+  const float LASER_STDDEV_;
+  const float LASER_SHORT_CUTOFF_;
+  const float LASER_LONG_CUTOFF_;
+  const float RESAMPLE_INTERVAL_;
+  const float MIN_ANGLE_CHANGE_;
+  const float MIN_DIST_CHANGE_;
 };
-
-
-}  // namespace particle_filter
+}  // namespace slam
 
 #endif   // SRC_PARTICLE_FILTER_H_

@@ -37,6 +37,7 @@ using Eigen::Vector2f;
 using amrl_msgs::ColoredArc2D;
 using amrl_msgs::ColoredLine2D;
 using amrl_msgs::ColoredPoint2D;
+using amrl_msgs::ColoredText;
 using amrl_msgs::Pose2Df;
 using amrl_msgs::VisualizationMsg;
 using std::max;
@@ -173,5 +174,20 @@ void DrawRectangle(const Vector2f& loc,
   DrawLine(p1, p2, color, msg);
   DrawLine(p2, p3, color, msg);
   DrawLine(p3, p0, color, msg);
+}
+
+void DrawText(
+    const Eigen::Vector2f& start,
+    const uint32_t color,
+    float size_em,
+    const std::string&  text,
+    VisualizationMsg& msg
+) {
+  ColoredText ct;
+  SetPoint(start, &ct.start);
+  ct.color = color;
+  ct.size_em = size_em;
+  ct.text = text;
+  msg.text_annotations.push_back(ct);
 }
 }  // namespace visualization
