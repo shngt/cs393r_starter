@@ -176,8 +176,7 @@ void Navigation::Run() {
   // }
 
   // Check if the robot is within a certain distance of the goal
-  if ((nav_goal_loc_ - robot_loc_).norm() < 0.1) {
-    printf("Navigation complete\n");
+  if ((nav_goal_loc_ - robot_loc_).norm() < 0.5) {
     nav_complete_ = true;
   }
 
@@ -191,6 +190,7 @@ void Navigation::Run() {
 
   // Go through edges in reverse and check if the robot is within a certain distance of the edge
   bool on_path = false;
+  // printf("Nav path size: %lu\n", nav_path_.size());
   for (size_t i = nav_path_.size() - 1; i > 0; i--) {
     Vector2f edge_start = nav_path_[i - 1];
     Vector2f edge_end = nav_path_[i];
@@ -201,10 +201,10 @@ void Navigation::Run() {
       break;
     }
   }
-
+  // printf("On path: %d\n", on_path);
   // If the robot is not on the path, replan
-  nav_path_.clear();
   if (!on_path) {
+    nav_path_.clear();
     PlanPath(robot_loc_, nav_goal_loc_, map_, nav_path_);
   }
 
@@ -248,7 +248,7 @@ void Navigation::Run() {
 
   drive_msg_.curvature = path_options[best_path].curvature;
   drive_msg_.velocity = run1DTimeOptimalControl(path_options[best_path].free_path_length, current_speed, robot_config_);
-	printf("Curvature: %f, Velocity: %f\n", drive_msg_.curvature, drive_msg_.velocity);
+	// printf("Curvature: %f, Velocity: %f\n", drive_msg_.curvature, drive_msg_.velocity);
   // cout << drive_msg_.curvature << " " << drive_msg_.velocity << endl;
 
   // visualization here

@@ -175,8 +175,8 @@ float score(float free_path_length, float curvature, float clearance) {
 // if there are multiple paths with the same free path length, return the one with the smallest curvature
 int selectPath(const vector<navigation::PathOption>& path_options, const Vector2f& carrot_point) {
     int selected_path = 0;
-    printf("--------------\n");
-    printf("Carrot Point: %f, %f\n", carrot_point[0], carrot_point[1]);
+    // printf("--------------\n");
+    // printf("Carrot Point: %f, %f\n", carrot_point[0], carrot_point[1]);
     float best_score = INFINITY;
     // float distance_from_carrot = geometry::
     for (unsigned int i = 0; i < path_options.size(); i++) {
