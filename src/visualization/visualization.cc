@@ -130,24 +130,65 @@ void DrawPathOption(const float curvature,
                     const float clearance,
                     const uint32_t color,
                     bool show_clearance,
+                    bool reverse,
                     VisualizationMsg& msg) {
   // TODO: color by clearance.
   // static const uint32_t kPathColor = 0xC0C0C0;
   if (fabs(curvature) < 0.001) {
-    DrawLine(Vector2f(0, 0), Vector2f(distance, 0), color, msg);
+    if (!reverse)
+      DrawLine(Vector2f(0, 0), Vector2f(distance, 0), color, msg);
+    else
+      DrawLine(Vector2f(0, 0), Vector2f(-distance, 0), color, msg);
     if (show_clearance) {
-      DrawLine(
-          Vector2f(0, clearance), Vector2f(distance, clearance), color, msg);
-      DrawLine(
-          Vector2f(0, -clearance), Vector2f(distance, -clearance), color, msg);
+      if (!reverse) {
+        DrawLine(
+            Vector2f(0, clearance), Vector2f(distance, clearance), color, msg);
+        DrawLine(
+            Vector2f(0, -clearance), Vector2f(distance, -clearance), color, msg);
+      } else {
+        DrawLine(
+            Vector2f(0, clearance), Vector2f(-distance, clearance), color, msg);
+        DrawLine(
+            Vector2f(0, -clearance), Vector2f(-distance, -clearance), color, msg);
+      }
     }
   } else {
     const float r = 1.0f / curvature;
     const Vector2f center(0, r);
-    const float a = fabs(distance * curvature);
-    const float a0 = ((curvature > 0.0f) ? -M_PI_2 : (M_PI_2 - a));
-    const float a1 = ((curvature > 0.0f) ? (-M_PI_2 + a) : M_PI_2);
+    // if (reverse) return;
+    const float a = fabs(distance * curvature);    
+    // const float a0 = ((curvature > 0.0f) ? -M_PI_2 : (M_PI_2 - a));
+    // const float a1 = ((curvature > 0.0f) ? (-M_PI_2 + a) : M_PI_2);
+    // if (reverse) std::cout << "arc theta " << a << std::endl;
+    // float a0 = (curvature > 0.0f) ? -M_PI_2 : (M_PI_2 - a);
+    float a0, a1;
+    if (!reverse) {
+      a0 = (curvature > 0.0f) ? -M_PI_2 : (M_PI_2 - a);
+    } else {
+      a0 = (curvature > 0.0f) ? (-M_PI_2 - a) : (M_PI_2);
+    }
+    if (!reverse) {
+      a1 = (curvature > 0.0f) ? (-M_PI_2 + a) : (M_PI_2);
+    } else {
+      a1 = (curvature > 0.0f) ? -M_PI_2 : (M_PI_2 + a);
+    }
+    // const float a1 = reverse ? ((curvature > 0.0f) ? (-M_PI_2 - a) : (M_PI_2 + a)) : ((curvature > 0.0f) ? (-M_PI_2 + a) : (M_PI_2 - a));
+    // const float a0 = reverse ? ((curvature > 0.0f) ? -M_PI_2 : (M_PI_2 + a)) : ((curvature > 0.0f) ? -M_PI_2 : (M_PI_2 - a));
+    // const float a1 = reverse ? ((curvature > 0.0f) ? -M_PI_2 - a : (M_PI_2)) : ((curvature > 0.0f) ? (-M_PI_2 + a) : M_PI_2);
     DrawArc(center, fabs(r), a0, a1, color, msg);
+    // Vector2f end_point;
+    // if (!reverse) {
+    //   if (r > 0)
+    //     end_point = center + Rotation2Df(a1 - a0) * Vector2f(0, -r);
+    //   else
+    //     end_point = center + Rotation2Df(a0 - a1) * Vector2f(0, -r);
+    // } else {
+    //   if (r > 0)
+    //     end_point = center + Rotation2Df(a0 - a1) * Vector2f(0, -r);
+    //   else
+    //     end_point = center + Rotation2Df(a1 - a0) * Vector2f(0, -r);
+    // }
+    // DrawCross(end_point, 0.1, color, msg);
     if (show_clearance) {
       DrawArc(center, max<float>(0, fabs(r) - clearance), a0, a1, color, msg);
       DrawArc(center, max<float>(0, fabs(r) + clearance), a0, a1, color, msg);

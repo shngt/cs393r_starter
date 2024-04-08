@@ -77,6 +77,7 @@ void DrawPathOption(const float curvature,
                     const float clearance,
                     const uint32_t color,
                     bool show_clearance,
+                    bool reverse,
                     amrl_msgs::VisualizationMsg& msg);
 
 void DrawText(

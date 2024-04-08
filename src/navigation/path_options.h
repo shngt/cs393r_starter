@@ -7,10 +7,11 @@ using Eigen::Vector2f;
 #ifndef PATH_OPTIONS_H
 #define PATH_OPTIONS_H
 
-float run1DTimeOptimalControl(float dist_to_go, float current_speed, const navigation::NavigationParams& nav_params);
+float run1DTimeOptimalControl(float dist_to_go, float current_speed, bool reverse, const navigation::NavigationParams& nav_params);
 
 void setPathOption(navigation::PathOption& path_option,
     float curvature,
+    bool reverse,
     const std::vector<Eigen::Vector2f>& point_cloud,
     const navigation::NavigationParams& nav_params);
 

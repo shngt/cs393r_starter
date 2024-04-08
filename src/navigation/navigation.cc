@@ -89,8 +89,8 @@ Navigation::Navigation(const string& map_name, ros::NodeHandle* n) :
 
 void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
   // visualization::ClearVisualizationMsg(local_viz_msg_);
-  printf("Current position is (%f, %f) angle %f\n", robot_loc_.x(), robot_loc_.y(), robot_angle_);
-  printf("Setting navigation goal to (%f, %f) angle %f\n", loc.x(), loc.y(), angle);
+  // printf("Current position is (%f, %f) angle %f\n", robot_loc_.x(), robot_loc_.y(), robot_angle_);
+  // printf("Setting navigation goal to (%f, %f) angle %f\n", loc.x(), loc.y(), angle);
   // Clear previous path
   nav_path_.clear();
   nav_goal_loc_ = loc;
@@ -247,7 +247,7 @@ void Navigation::Run() {
   int best_path = selectPath(path_options, carrot_point_robot);
 
   drive_msg_.curvature = path_options[best_path].curvature;
-  drive_msg_.velocity = run1DTimeOptimalControl(path_options[best_path].free_path_length, current_speed, robot_config_);
+  drive_msg_.velocity = run1DTimeOptimalControl(path_options[best_path].free_path_length, current_speed, path_options[best_path].reverse, robot_config_);
 	// printf("Curvature: %f, Velocity: %f\n", drive_msg_.curvature, drive_msg_.velocity);
   // cout << drive_msg_.curvature << " " << drive_msg_.velocity << endl;
 
@@ -256,10 +256,24 @@ void Navigation::Run() {
       robot_config_.length, robot_config_.width, 0, 0x00FF00, local_viz_msg_);
   // Draw all path options in blue
   for (unsigned int i = 0; i < path_options.size(); i++) {
-      visualization::DrawPathOption(path_options[i].curvature, path_options[i].free_path_length, 0, 0x0000FF, false, local_viz_msg_);
+      visualization::DrawPathOption(
+        path_options[i].curvature, 
+        path_options[i].free_path_length, 
+        0, 
+        0x0000FF, 
+        false, 
+        path_options[i].reverse,
+        local_viz_msg_);
   }
   // Draw the best path in red
-  visualization::DrawPathOption(path_options[best_path].curvature, path_options[best_path].free_path_length, path_options[best_path].clearance, 0xFF0000, true, local_viz_msg_);
+  visualization::DrawPathOption(
+    path_options[best_path].curvature, 
+    path_options[best_path].free_path_length, 
+    path_options[best_path].clearance, 
+    0xFF0000, 
+    true, 
+    path_options[best_path].reverse,
+    local_viz_msg_);
 // Find the closest point in the point cloud
 
   // Plot the closest point in purple

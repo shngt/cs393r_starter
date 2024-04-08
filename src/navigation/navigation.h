@@ -37,6 +37,7 @@ namespace navigation {
 
 struct PathOption {
   float curvature = 0;
+  bool reverse = false;
   float clearance = 10;
   float free_path_length = 100;
   Eigen::Vector2f obstruction = Eigen::Vector2f::Zero();
