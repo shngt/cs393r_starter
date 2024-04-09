@@ -52,7 +52,7 @@ void setPathOption(navigation::PathOption& path_option,
     path_option.reverse = reverse;
     // Hardcoded values in the reverse case to start
     if (reverse) {
-        path_option.free_path_length = 1.0;
+        path_option.free_path_length = 1.5;
         path_option.obstruction = Eigen::Vector2f::Zero();
         // Iterate through point cloud and set distance of closest point as clearance
         path_option.clearance = 5.0;
@@ -292,9 +292,9 @@ vector<navigation::PathOption> samplePathOptions(int num_options,
 }
 
 float score(float free_path_length, float curvature, float clearance) {
-    const float w1 = 0.5;
+    const float w1 = 0.7;
     const float w2 = 0;
-    const float w3 = 0.2;
+    const float w3 = 0.3;
     return w1 * free_path_length + w2 * abs(1/curvature) + w3 * clearance;
 }
 
@@ -370,7 +370,7 @@ int selectPath(const vector<navigation::PathOption>& path_options, const Vector2
         // printf("Carrot Point: %f, %f\n", carrot_point[0], carrot_point[1]);
         // printf("Carrot Point Theta: %f\n", carrot_point_theta);
         // printf("Carrot Path Distance: %f for curvature: %f with reverse: %d\n", carrot_path_distance, path_curvature, path_options[i].reverse);
-        float s = -score(path_options[i].free_path_length, path_curvature, path_options[i].clearance) + 10 * carrot_path_distance;
+        float s = -score(path_options[i].free_path_length, path_curvature, path_options[i].clearance) + 4 * carrot_path_distance;
         if (s < best_score) {
             best_score = s;
             selected_path = i;
