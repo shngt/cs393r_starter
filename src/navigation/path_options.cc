@@ -52,7 +52,7 @@ void setPathOption(navigation::PathOption& path_option,
     path_option.reverse = reverse;
     // Hardcoded values in the reverse case to start
     if (reverse) {
-        path_option.free_path_length = 0.0;
+        path_option.free_path_length = 0.8;
         path_option.obstruction = Eigen::Vector2f::Zero();
         // Iterate through point cloud and set distance of closest point as clearance
         path_option.clearance = 5.0;
