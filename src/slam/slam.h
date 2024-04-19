@@ -30,6 +30,12 @@
 
 namespace slam {
 
+struct Pose {
+  Eigen::Vector2f loc;
+  float angle;
+  float log_likelihood;
+};
+
 class SLAM {
  public:
   // Default Constructor.
@@ -58,6 +64,15 @@ class SLAM {
   Eigen::Vector2f prev_odom_loc_;
   float prev_odom_angle_;
   bool odom_initialized_;
+  vector<Pose> candidate_poses_;
+
+  // Estimated robot pose
+  Eigen::Vector2f estimated_loc_;
+  float estimated_angle_;
+
+  // Thresholds for adding new pose
+  float loc_threshold_;
+  float angle_threshold_;
 };
 }  // namespace slam
 

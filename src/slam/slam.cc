@@ -50,9 +50,9 @@ using vector_map::VectorMap;
 namespace slam {
 
 SLAM::SLAM() :
-    x_res(10.0),
-    y_res(10.0),
-    t_res(30.0),
+    x_freq_(11.0),
+    y_freq_(11.0),
+    theta_freq_(31.0),
     prev_odom_loc_(0, 0),
     prev_odom_angle_(0),
     odom_initialized_(false) {}
@@ -95,33 +95,34 @@ void SLAM::PredictMotionModel(const Vector2f& odom_loc, const float odom_angle, 
   float angle_stddev = K1_ * angle_diff + K2_ * loc_diff;
   float loc_stddev = K3_ * angle_diff + K4_ * loc_diff;
 
-  // Calculate sin(theta) and cos(theta) for trig computations
-  const float cos_angle = cos(current_pose_angle);
-  const float sin_angle = sin(current_pose_angle);
+  // Cache sin and cos for efficieny
+  float cos_pose_angle = cos(current_pose_angle);
+  float sin_pose_angle = sin(current_pose_angle);
 
-  // 3 for loops for each dimension of voxel cube (x, y, theta)
-	for (int x_i=0; x_i<x_res_; x_i++)
-	{
-		float x_noise = x_stddev*(2*x_i/(x_res_-1)-1);
-		// float x_noise = 0; //odom only
-		for (int y_i=0; y_i<y_res_; y_i++)
-		{
-			float y_noise = y_stddev*(2*y_i/(y_res_-1)-1);
-			// float y_noise = 0; //odom only
-			for (int t_i=0; t_i<t_res_; t_i++)
-			{
-				float t_noise = t_stddev*(2*t_i/(t_res_-1)-1);
-				// float t_noise = 0; //odom only
-				float t_pose = current_pose_angle + t_noise;
-				float x_pose = odom_loc.x() + x_noise*cos_angle - y_noise*sin_angle;
-				float y_pose = odom_loc.y() + x_noise*sin_angle + y_noise*cos_angle;
+  // Iterate over all possible combinations of pose (x, y, theta)
+  for (int x_r = 0; x_r < x_freq_; x_r++) {
+    float x_r_norm = (2 * x_r / (x_freq_ - 1) - 1);
+		float del_x = loc_stddev * x_r_norm;
+    for (int y_r = 0; y_r < y_freq_; y_r++) {
+      float y_r_norm = (2 * y_r / (y_freq_ - 1) - 1);
+			float del_y = loc_stddev * y_r_norm;
+      for (int theta_r = 0; theta_r < theta_freq_; theta_r++) {
+        float theta_r_norm = (2 * theta_r / (theta_freq_ - 1) - 1);
+				float del_theta = angle_stddev * theta_r_norm;
+
+				float x_pose = odom_loc.x() + del_x * cos_pose_angle - del_y * sin_pose_angle;
+				float y_pose = odom_loc.y() + del_x * sin_pose_angle + del_y * cos_pose_angle;
+				float theta_pose = current_pose_angle + del_theta;
+
 				// Calculate the motion model likelihood
-				float log_likelihood = -(x_noise*x_noise)/(x_stddev*x_stddev) 
-								   -(y_noise*y_noise)/(y_stddev*y_stddev) 
-								   -(t_noise*t_noise)/(t_stddev*t_stddev);
-				
-				Pose this_pose = {{x_pose, y_pose}, t_pose};
-				possible_poses_.push_back({this_pose, log_likelihood});
+				// float log_likelihood = -(x_noise*x_noise)/(loc_stddev*loc_stddev) 
+				// 				   -(y_noise*y_noise)/(loc_stddev*loc_stddev) 
+				// 				   -(t_noise*t_noise)/(t_stddev*t_stddev);
+
+        float log_likelihood = - (x_r * x_r) - (y_r * y_r) - (theta_r * theta_r);
+
+        int idx = x_r * y_freq_ * theta_freq_ + y_r * theta_freq_ + theta_r;
+				candidate_poses_[idx] = {{x_pose, y_pose}, theta_pose, log_likelihood};
 			}
 		}
 	}
@@ -136,6 +137,19 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   }
   // Keep track of odometry to estimate how far the robot has moved between 
   // poses.
+  Vector2f odom_diff = odom_loc - prev_odom_loc_;
+  float angle_diff = AngleDiff(odom_angle, prev_odom_angle_);
+  float dist = odom_diff.norm();
+
+  Vector2f projected_loc = estimated_loc_ + Rotation2Df(estimated_angle_) * odom_diff;
+  float projected_angle = AngleMod(estimated_angle_ + angle_diff);
+
+  if (dist > loc_threshold_ || fabs(angle_diff) > angle_threshold_) {
+    // Update the candidate poses based on the odometry
+    PredictMotionModel(odom_loc, odom_angle, projected_angle);
+    prev_odom_angle_ = odom_angle;
+    prev_odom_loc_ = odom_loc;
+  }
 }
 
 vector<Vector2f> SLAM::GetMap() {
