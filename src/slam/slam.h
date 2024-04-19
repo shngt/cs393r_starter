@@ -73,6 +73,9 @@ class SLAM {
   // Thresholds for adding new pose
   float loc_threshold_;
   float angle_threshold_;
+
+  // Flag to indicate if a new scan should be applied
+  bool apply_new_scan_;
 };
 }  // namespace slam
 

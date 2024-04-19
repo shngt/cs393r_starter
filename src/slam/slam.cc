@@ -71,6 +71,11 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // A new laser scan has been observed. Decide whether to add it as a pose
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
+  if (!apply_new_scan_) {
+    return;
+  }
+  apply_new_scan_ = false;
+
   vector<Vector2f> point_cloud(ranges.size());
   const float angle_increment = (angle_max - angle_min) / ranges.size();
   // save the pointcloud in the robot's frame
@@ -78,8 +83,8 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   for (size_t i = 0; i < ranges.size(); i++) {
     if (ranges[i] > range_min && ranges[i] < range_max) {
       const float angle = angle_min + i * angle_increment;
-      const Vector2f point(ranges[i] * cos(angle), 0.2 + ranges[i] * sin(angle));
-      point_cloud.push_back(point);
+      Vector2f point(ranges[i] * cos(angle), 0.2 + ranges[i] * sin(angle));
+      point_cloud[i] = point;
     }
   }
 }
@@ -158,6 +163,8 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   if (dist > loc_threshold_ || fabs(angle_diff) > angle_threshold_) {
     // Update the candidate poses based on the odometry
     PredictMotionModel(odom_loc, odom_angle, projected_angle);
+    // Set flag to add new scan
+    apply_new_scan_ = true;
     prev_odom_angle_ = odom_angle;
     prev_odom_loc_ = odom_loc;
   }
