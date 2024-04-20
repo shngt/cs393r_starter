@@ -69,9 +69,6 @@ class SLAM {
   Eigen::Vector2f estimated_loc_;
   float estimated_angle_;
 
-  // All possible candidate poses from motion model
-  vector<Pose> candidate_poses_;
-
   // Thresholds for adding new pose
   float loc_threshold_;
   float angle_threshold_;
@@ -84,10 +81,13 @@ class SLAM {
   float y_freq_;
   float theta_freq_;
 
+  // All possible candidate poses from motion model
+  std::vector<Pose> candidate_poses_;
+
   // Log probability grid for CSM
   std::vector<std::vector<float>> log_prob_grid_;
   float log_prob_grid_resolution_;
-  Vector2f log_prob_grid_origin_;
+  Eigen::Vector2f log_prob_grid_origin_;
   bool log_prob_grid_initialized_;
 
   // Map

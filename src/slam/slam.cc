@@ -59,16 +59,17 @@ SLAM::SLAM() :
     odom_initialized_(false),
     estimated_loc_(0, 0),
     estimated_angle_(0),
-    candidate_poses_(vector<Pose>(x_freq_ * y_freq_ * theta_freq_)),
+    loc_threshold_(0.5),
+    angle_threshold_(M_PI / 6),
+    apply_new_scan_(false),
     x_freq_(11.0),
     y_freq_(11.0),
     theta_freq_(31.0),
-    loc_threshold_(0.5),
-    angle_threshold_(M_PI / 6),
+    candidate_poses_(vector<Pose>(x_freq_ * y_freq_ * theta_freq_)),
     log_prob_grid_(500, vector<float>(500, 0.0)), 
     log_prob_grid_resolution_(0.02),
     log_prob_grid_origin_(Vector2f(-10, -10)),
-    apply_new_scan_(false),
+    log_prob_grid_initialized_(false)
     {
     }
 
