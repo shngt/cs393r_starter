@@ -50,6 +50,10 @@ using vector_map::VectorMap;
 namespace slam {
 
 SLAM::SLAM() :
+    K1_(0.3),
+    K2_(0.3),
+    K3_(0.5),
+    K4_(0.5)
     x_freq_(11.0),
     y_freq_(11.0),
     theta_freq_(31.0),
@@ -87,6 +91,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
       point_cloud[i] = point;
     }
   }
+
 }
 
 void SLAM::PredictMotionModel(const Vector2f& odom_loc, const float odom_angle, float current_pose_angle){
