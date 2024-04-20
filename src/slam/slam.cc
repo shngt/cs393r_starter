@@ -54,17 +54,74 @@ SLAM::SLAM() :
     K2_(0.3),
     K3_(0.5),
     K4_(0.5)
+    prev_odom_loc_(0, 0),
+    prev_odom_angle_(0),
+    odom_initialized_(false),
+    estimated_loc_(0, 0),
+    estimated_angle_(0),
+    candidate_poses_(vector<Pose>(x_freq_ * y_freq_ * theta_freq_)),
     x_freq_(11.0),
     y_freq_(11.0),
     theta_freq_(31.0),
-    prev_odom_loc_(0, 0),
-    prev_odom_angle_(0),
-    odom_initialized_(false) {}
+    loc_threshold_(0.5),
+    angle_threshold_(M_PI / 6),
+    log_prob_grid_(500, vector<float>(500, 0.0)), 
+    log_prob_grid_resolution_(0.02),
+    log_prob_grid_origin_(Vector2f(-10, -10)),
+    apply_new_scan_(false),
+    {
+    }
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
   // Return the latest pose estimate of the robot.
   *loc = Vector2f(0, 0);
   *angle = 0;
+}
+
+void SLAM::TransformPointCloud(const vector<Vector2f>& point_cloud,
+                               const Pose& pose,
+                               vector<Vector2f>* transformed) {
+  // Transform the point cloud to the pose's frame.
+  transformed->clear();
+  for (const Vector2f& point : point_cloud) {
+    // Rotate the point by the pose's angle.
+    // Translate the point by the pose's location.
+    Vector2f transformed_point = Rotation2Df(pose.angle) * point + pose.loc;
+    transformed->push_back(transformed_point);
+  }
+}
+
+void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
+  Pose best_pose = {{0, 0}, 0, -std::numeric_limits<float>::infinity()};
+  for (const Pose& pose : candidate_poses_) {
+    // Run CSM algorithm to align the point cloud to the pose.
+    // Update best_pose if the new pose is better.
+    float pose_observation_log_likelihood = 0;
+    for (const Vector2f& point : point_cloud) {
+      // Transform the point to the pose's frame.
+      Vector2f loc_diff = pose.loc - estimated_loc_;
+      float angle_diff = AngleDiff(pose.angle, estimated_angle_);
+      loc_diff = Rotation2Df(-pose.angle) * loc_diff; // Rotate the point by the pose's angle. // Rotation2Df(-estimated_angle) * loc_diff;
+      Vector2f transformed_point = Rotation2Df(angle_diff) * point + loc_diff;
+      // Look up probability of the point in the log probability grid.
+      Vector2f grid_point = (transformed_point - log_prob_grid_origin_) / log_prob_grid_resolution_;
+      int x = grid_point.x(), y = grid_point.y();
+      if (x >= 0 && x < log_prob_grid_.size() && y >= 0 && y < log_prob_grid_[0].size()) {
+        float log_prob = log_prob_grid_[x][y];
+        pose_observation_log_likelihood += log_prob;
+      }
+    }
+    // Add the motion model likelihood to the pose likelihood.
+    float pose_log_likelihood = pose_observation_log_likelihood + pose.log_likelihood;
+    // Update the best pose if the new pose is better.
+    if (pose_log_likelihood > best_pose.log_likelihood) {
+      best_pose = pose;
+      best_pose.log_likelihood = pose_log_likelihood;
+    }
+  }
+  // Save the best pose as the new estimated pose.
+  estimated_loc_ = best_pose.loc;
+  estimated_angle_ = best_pose.angle;
 }
 
 void SLAM::ObserveLaser(const vector<float>& ranges,
@@ -75,7 +132,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // A new laser scan has been observed. Decide whether to add it as a pose
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
-  if (!apply_new_scan_) {
+  if (!apply_new_scan_ || (odom_initialized_ && log_prob_grid_initialized_)) {
     return;
   }
   apply_new_scan_ = false;
@@ -92,9 +149,39 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
     }
   }
 
+  // Run CSM to align the point cloud to the last saved pose
+  RunCSM(point_cloud);
+
+  // Transform the point cloud to the estimated pose and add to map
+  for (size_t i = 0; i < point_cloud.size(); i++) {
+    map.push_back(Rotation2Df(estimated_angle_) * point_cloud[i] + estimated_loc_);
+  }
+
+  // Apply the new point cloud to the log probability grid
+  // Iterate over all points in the point cloud and update the log probability
+  for (const Vector2f& point : point_cloud) {
+    // Get index of point in log probability grid
+    Vector2f grid_point = (point - log_prob_grid_origin_) / log_prob_grid_resolution_;
+    int max_offset = 30 * 0.01 / log_prob_grid_resolution_;
+    // Iterate over all points in the log probability grid within max_offset of grid_point
+    for (int x_offset = -max_offset; x_offset <= max_offset; x_offset++) {
+      for (int y_offset = -max_offset; y_offset <= max_offset; y_offset++) {
+        int x = grid_point.x() + x_offset, y = grid_point.y() + y_offset;
+        if (x >= 0 && x < log_prob_grid_.size() && y >= 0 && y < log_prob_grid_[0].size()) {
+          float x_dist = x_offset * log_prob_grid_resolution_;
+          float y_dist = y_offset * log_prob_grid_resolution_;
+          float dist = sqrt(x_dist * x_dist + y_dist * y_dist);
+          float log_prob = -dist * dist / (2 * 0.01 * 0.01);
+          log_prob_grid_[x][y] = std::max(log_prob_grid_[x][y], log_prob)
+        }
+      }
+    }
+  }
+
+  apply_new_scan_ = false;
 }
 
-void SLAM::PredictMotionModel(const Vector2f& odom_loc, const float odom_angle, float current_pose_angle){
+void SLAM::PredictMotionModel(const Vector2f& odom_loc, const float odom_angle, Vector2f current_pose_loc, float current_pose_angle){
   static CumulativeFunctionTimer function_timer_(__FUNCTION__);
   CumulativeFunctionTimer::Invocation invoke(&function_timer_);   
   // The very first callback goes here
@@ -131,8 +218,8 @@ void SLAM::PredictMotionModel(const Vector2f& odom_loc, const float odom_angle, 
         float theta_r_norm = (2 * theta_r / (theta_freq_ - 1) - 1);
 				float del_theta = angle_stddev * theta_r_norm;
 
-				float x_pose = odom_loc.x() + del_x * cos_pose_angle - del_y * sin_pose_angle;
-				float y_pose = odom_loc.y() + del_x * sin_pose_angle + del_y * cos_pose_angle;
+				float x_pose = current_pose_loc.x() + del_x * cos_pose_angle - del_y * sin_pose_angle;
+				float y_pose = current_pose_loc.y() + del_x * sin_pose_angle + del_y * cos_pose_angle;
 				float theta_pose = current_pose_angle + del_theta;
 
 				// Calculate the motion model likelihood
@@ -140,7 +227,7 @@ void SLAM::PredictMotionModel(const Vector2f& odom_loc, const float odom_angle, 
 				// 				   -(y_noise*y_noise)/(loc_stddev*loc_stddev) 
 				// 				   -(t_noise*t_noise)/(t_stddev*t_stddev);
 
-        float log_likelihood = - (x_r * x_r) - (y_r * y_r) - (theta_r * theta_r);
+        float log_likelihood = -1.0 * (x_r * x_r + y_r * y_r + theta_r * theta_r) / 2.0 ;
 
         int idx = x_r * y_freq_ * theta_freq_ + y_r * theta_freq_ + theta_r;
 				candidate_poses_[idx] = {{x_pose, y_pose}, theta_pose, log_likelihood};
@@ -162,7 +249,7 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   float angle_diff = AngleDiff(odom_angle, prev_odom_angle_);
   float dist = odom_diff.norm();
 
-  Vector2f projected_loc = estimated_loc_ + Rotation2Df(estimated_angle_) * odom_diff;
+  Vector2f projected_loc = estimated_loc_ + Rotation2Df(estimated_angle_ - prev_odom_angle_) * odom_diff;
   float projected_angle = AngleMod(estimated_angle_ + angle_diff);
 
   if (dist > loc_threshold_ || fabs(angle_diff) > angle_threshold_) {

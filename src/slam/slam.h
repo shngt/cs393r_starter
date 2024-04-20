@@ -64,11 +64,13 @@ class SLAM {
   Eigen::Vector2f prev_odom_loc_;
   float prev_odom_angle_;
   bool odom_initialized_;
-  vector<Pose> candidate_poses_;
 
   // Estimated robot pose
   Eigen::Vector2f estimated_loc_;
   float estimated_angle_;
+
+  // All possible candidate poses from motion model
+  vector<Pose> candidate_poses_;
 
   // Thresholds for adding new pose
   float loc_threshold_;
@@ -76,6 +78,20 @@ class SLAM {
 
   // Flag to indicate if a new scan should be applied
   bool apply_new_scan_;
+
+  // Frequency of x, y, and theta sampling in the motion model calculations
+  float x_freq_;
+  float y_freq_;
+  float theta_freq_;
+
+  // Log probability grid for CSM
+  std::vector<std::vector<float>> log_prob_grid_;
+  float log_prob_grid_resolution_;
+  Vector2f log_prob_grid_origin_;
+  bool log_prob_grid_initialized_;
+
+  // Map
+  std::vector<Eigen::Vector2f> map_;
 };
 }  // namespace slam
 
