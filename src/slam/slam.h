@@ -101,6 +101,9 @@ class SLAM {
 
   // Map
   std::vector<Eigen::Vector2f> map_;
+
+  // For convariance calcular
+  std::vector<Matrix3f> covariances_;
 };
 }  // namespace slam
 

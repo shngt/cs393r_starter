@@ -110,6 +110,22 @@ void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
   // Save the best pose as the new estimated pose.
   estimated_loc_ = best_pose.loc;
   estimated_angle_ = best_pose.angle;
+
+  // Calculate covariances
+  Eigen::Matrix3f sigma_xi = Eigen::Matrix3f::Zero();
+  Eigen::Matrix3f K = Eigen::Matrix3f::Zero();
+  Vector3f u = Vector3f::Zero();
+  Vector3f 
+  float s = 0.0; 
+    for (int i = 0; i <= candidate_poses_.size(); i++) {
+      Vector3f xi[candidate_poses_[i].loc.x(), candidate_poses_[i].loc.y(), candidate_poses_[i].angle];
+      K += xi * xi.transpose() * candidate_poses_[i].log_likelihood;
+      u += xi * candidate_poses_[i].log_likelihood;
+      s += candidate_poses_[i].log_likelihood;
+      sigma_xi += (1/s)*K - (1/(pow(s,2)))*u*u.transpose();
+    }
+  covariances_.push_back(sigma_xi);
+}
 }
 
 void SLAM::ObserveLaser(const vector<float>& ranges,
@@ -167,6 +183,10 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   }
 
   apply_new_scan_ = false;
+
+  // Run GTSAM, place covariance in prior noise
+
+  
 }
 
 void SLAM::PredictMotionModel(const Vector2f& odom_loc, const float odom_angle, Vector2f current_pose_loc, float current_pose_angle){
