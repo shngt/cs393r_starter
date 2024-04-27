@@ -41,12 +41,17 @@ class SLAM {
   // Default Constructor.
   SLAM();
 
+  // Run CSM on the given point cloud
+  void RunCSM(const std::vector<Eigen::Vector2f>& point_cloud);
+
   // Observe a new laser scan.
   void ObserveLaser(const std::vector<float>& ranges,
                     float range_min,
                     float range_max,
                     float angle_min,
                     float angle_max);
+
+  void PredictMotionModel(const Eigen::Vector2f& odom_loc, const float odom_angle, Eigen::Vector2f current_pose_loc, float current_pose_angle);
 
   // Observe new odometry-reported location.
   void ObserveOdometry(const Eigen::Vector2f& odom_loc,
@@ -59,6 +64,10 @@ class SLAM {
   void GetPose(Eigen::Vector2f* loc, float* angle) const;
 
  private:
+  float K1_;
+  float K2_;
+  float K3_;
+  float K4_;
 
   // Previous odometry-reported locations.
   Eigen::Vector2f prev_odom_loc_;

@@ -53,7 +53,7 @@ SLAM::SLAM() :
     K1_(0.3),
     K2_(0.3),
     K3_(0.5),
-    K4_(0.5)
+    K4_(0.5),
     prev_odom_loc_(0, 0),
     prev_odom_angle_(0),
     odom_initialized_(false),
@@ -79,19 +79,6 @@ void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
   *angle = 0;
 }
 
-void SLAM::TransformPointCloud(const vector<Vector2f>& point_cloud,
-                               const Pose& pose,
-                               vector<Vector2f>* transformed) {
-  // Transform the point cloud to the pose's frame.
-  transformed->clear();
-  for (const Vector2f& point : point_cloud) {
-    // Rotate the point by the pose's angle.
-    // Translate the point by the pose's location.
-    Vector2f transformed_point = Rotation2Df(pose.angle) * point + pose.loc;
-    transformed->push_back(transformed_point);
-  }
-}
-
 void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
   Pose best_pose = {{0, 0}, 0, -std::numeric_limits<float>::infinity()};
   for (const Pose& pose : candidate_poses_) {
@@ -107,7 +94,7 @@ void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
       // Look up probability of the point in the log probability grid.
       Vector2f grid_point = (transformed_point - log_prob_grid_origin_) / log_prob_grid_resolution_;
       int x = grid_point.x(), y = grid_point.y();
-      if (x >= 0 && x < log_prob_grid_.size() && y >= 0 && y < log_prob_grid_[0].size()) {
+      if (x >= 0 && x < (int) log_prob_grid_.size() && y >= 0 && y < (int) log_prob_grid_[0].size()) {
         float log_prob = log_prob_grid_[x][y];
         pose_observation_log_likelihood += log_prob;
       }
@@ -155,7 +142,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
   // Transform the point cloud to the estimated pose and add to map
   for (size_t i = 0; i < point_cloud.size(); i++) {
-    map.push_back(Rotation2Df(estimated_angle_) * point_cloud[i] + estimated_loc_);
+    map_.push_back(Rotation2Df(estimated_angle_) * point_cloud[i] + estimated_loc_);
   }
 
   // Apply the new point cloud to the log probability grid
@@ -168,12 +155,12 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
     for (int x_offset = -max_offset; x_offset <= max_offset; x_offset++) {
       for (int y_offset = -max_offset; y_offset <= max_offset; y_offset++) {
         int x = grid_point.x() + x_offset, y = grid_point.y() + y_offset;
-        if (x >= 0 && x < log_prob_grid_.size() && y >= 0 && y < log_prob_grid_[0].size()) {
+        if (x >= 0 && x < (int) log_prob_grid_.size() && y >= 0 && y < (int) log_prob_grid_[0].size()) {
           float x_dist = x_offset * log_prob_grid_resolution_;
           float y_dist = y_offset * log_prob_grid_resolution_;
           float dist = sqrt(x_dist * x_dist + y_dist * y_dist);
           float log_prob = -dist * dist / (2 * 0.01 * 0.01);
-          log_prob_grid_[x][y] = std::max(log_prob_grid_[x][y], log_prob)
+          log_prob_grid_[x][y] = std::max(log_prob_grid_[x][y], log_prob);
         }
       }
     }
@@ -255,7 +242,7 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
 
   if (dist > loc_threshold_ || fabs(angle_diff) > angle_threshold_) {
     // Update the candidate poses based on the odometry
-    PredictMotionModel(odom_loc, odom_angle, projected_angle);
+    PredictMotionModel(odom_loc, odom_angle, projected_loc, projected_angle);
     // Set flag to add new scan
     apply_new_scan_ = true;
     prev_odom_angle_ = odom_angle;
