@@ -100,11 +100,11 @@ void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
       }
     }
     // Add the motion model likelihood to the pose likelihood.
-    float pose_log_likelihood = pose_observation_log_likelihood + pose.log_likelihood;
+    // float pose_log_likelihood = pose_observation_log_likelihood + pose.log_likelihood;
+    pose.log_likelihood += pose_observation_log_likelihood;
     // Update the best pose if the new pose is better.
-    if (pose_log_likelihood > best_pose.log_likelihood) {
+    if (pose.log_likelihood > best_pose.log_likelihood) {
       best_pose = pose;
-      best_pose.log_likelihood = pose_log_likelihood;
     }
   }
   // Save the best pose as the new estimated pose.
