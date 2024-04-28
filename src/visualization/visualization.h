@@ -77,15 +77,6 @@ void DrawPathOption(const float curvature,
                     const float clearance,
                     const uint32_t color,
                     bool show_clearance,
-                    bool reverse,
                     amrl_msgs::VisualizationMsg& msg);
-
-void DrawText(
-    const Eigen::Vector2f& start,
-    const uint32_t color,
-    float size_em,
-    const std::string&  text,
-    amrl_msgs::VisualizationMsg& msg
-);
 
 }  // namespace visualization

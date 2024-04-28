@@ -37,7 +37,6 @@ using Eigen::Vector2f;
 using amrl_msgs::ColoredArc2D;
 using amrl_msgs::ColoredLine2D;
 using amrl_msgs::ColoredPoint2D;
-using amrl_msgs::ColoredText;
 using amrl_msgs::Pose2Df;
 using amrl_msgs::VisualizationMsg;
 using std::max;
@@ -130,65 +129,24 @@ void DrawPathOption(const float curvature,
                     const float clearance,
                     const uint32_t color,
                     bool show_clearance,
-                    bool reverse,
                     VisualizationMsg& msg) {
   // TODO: color by clearance.
   // static const uint32_t kPathColor = 0xC0C0C0;
   if (fabs(curvature) < 0.001) {
-    if (!reverse)
-      DrawLine(Vector2f(0, 0), Vector2f(distance, 0), color, msg);
-    else
-      DrawLine(Vector2f(0, 0), Vector2f(-distance, 0), color, msg);
+    DrawLine(Vector2f(0, 0), Vector2f(distance, 0), color, msg);
     if (show_clearance) {
-      if (!reverse) {
-        DrawLine(
-            Vector2f(0, clearance), Vector2f(distance, clearance), color, msg);
-        DrawLine(
-            Vector2f(0, -clearance), Vector2f(distance, -clearance), color, msg);
-      } else {
-        DrawLine(
-            Vector2f(0, clearance), Vector2f(-distance, clearance), color, msg);
-        DrawLine(
-            Vector2f(0, -clearance), Vector2f(-distance, -clearance), color, msg);
-      }
+      DrawLine(
+          Vector2f(0, clearance), Vector2f(distance, clearance), color, msg);
+      DrawLine(
+          Vector2f(0, -clearance), Vector2f(distance, -clearance), color, msg);
     }
   } else {
     const float r = 1.0f / curvature;
     const Vector2f center(0, r);
-    // if (reverse) return;
-    const float a = fabs(distance * curvature);    
-    // const float a0 = ((curvature > 0.0f) ? -M_PI_2 : (M_PI_2 - a));
-    // const float a1 = ((curvature > 0.0f) ? (-M_PI_2 + a) : M_PI_2);
-    // if (reverse) std::cout << "arc theta " << a << std::endl;
-    // float a0 = (curvature > 0.0f) ? -M_PI_2 : (M_PI_2 - a);
-    float a0, a1;
-    if (!reverse) {
-      a0 = (curvature > 0.0f) ? -M_PI_2 : (M_PI_2 - a);
-    } else {
-      a0 = (curvature > 0.0f) ? (-M_PI_2 - a) : (M_PI_2);
-    }
-    if (!reverse) {
-      a1 = (curvature > 0.0f) ? (-M_PI_2 + a) : (M_PI_2);
-    } else {
-      a1 = (curvature > 0.0f) ? -M_PI_2 : (M_PI_2 + a);
-    }
-    // const float a1 = reverse ? ((curvature > 0.0f) ? (-M_PI_2 - a) : (M_PI_2 + a)) : ((curvature > 0.0f) ? (-M_PI_2 + a) : (M_PI_2 - a));
-    // const float a0 = reverse ? ((curvature > 0.0f) ? -M_PI_2 : (M_PI_2 + a)) : ((curvature > 0.0f) ? -M_PI_2 : (M_PI_2 - a));
-    // const float a1 = reverse ? ((curvature > 0.0f) ? -M_PI_2 - a : (M_PI_2)) : ((curvature > 0.0f) ? (-M_PI_2 + a) : M_PI_2);
+    const float a = fabs(distance * curvature);
+    const float a0 = ((curvature > 0.0f) ? -M_PI_2 : (M_PI_2 - a));
+    const float a1 = ((curvature > 0.0f) ? (-M_PI_2 + a) : M_PI_2);
     DrawArc(center, fabs(r), a0, a1, color, msg);
-    // Vector2f end_point;
-    // if (!reverse) {
-    //   if (r > 0)
-    //     end_point = center + Rotation2Df(a1 - a0) * Vector2f(0, -r);
-    //   else
-    //     end_point = center + Rotation2Df(a0 - a1) * Vector2f(0, -r);
-    // } else {
-    //   if (r > 0)
-    //     end_point = center + Rotation2Df(a0 - a1) * Vector2f(0, -r);
-    //   else
-    //     end_point = center + Rotation2Df(a1 - a0) * Vector2f(0, -r);
-    // }
-    // DrawCross(end_point, 0.1, color, msg);
     if (show_clearance) {
       DrawArc(center, max<float>(0, fabs(r) - clearance), a0, a1, color, msg);
       DrawArc(center, max<float>(0, fabs(r) + clearance), a0, a1, color, msg);
@@ -215,20 +173,5 @@ void DrawRectangle(const Vector2f& loc,
   DrawLine(p1, p2, color, msg);
   DrawLine(p2, p3, color, msg);
   DrawLine(p3, p0, color, msg);
-}
-
-void DrawText(
-    const Eigen::Vector2f& start,
-    const uint32_t color,
-    float size_em,
-    const std::string&  text,
-    VisualizationMsg& msg
-) {
-  ColoredText ct;
-  SetPoint(start, &ct.start);
-  ct.color = color;
-  ct.size_em = size_em;
-  ct.text = text;
-  msg.text_annotations.push_back(ct);
 }
 }  // namespace visualization
