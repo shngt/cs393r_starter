@@ -41,6 +41,8 @@ using Eigen::Rotation2Df;
 using Eigen::Translation2f;
 using Eigen::Vector2f;
 using Eigen::Vector2i;
+using Eigen::Vector3f;
+using Eigen::Matrix3f;
 using std::cout;
 using std::endl;
 using std::string;
@@ -76,13 +78,13 @@ SLAM::SLAM() :
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
   // Return the latest pose estimate of the robot.
-  *loc = Vector2f(0, 0);
-  *angle = 0;
+  *loc = estimated_loc_;
+  *angle = estimated_angle_;
 }
 
 void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
   Pose best_pose = {{0, 0}, 0, -std::numeric_limits<float>::infinity()};
-  for (const Pose& pose : candidate_poses_) {
+  for (Pose& pose : candidate_poses_) {
     // Run CSM algorithm to align the point cloud to the pose.
     // Update best_pose if the new pose is better.
     float pose_observation_log_likelihood = 0;
@@ -113,16 +115,15 @@ void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
   estimated_angle_ = best_pose.angle;
 
   // Calculate covariances
-  Eigen::Matrix3f sigma_xi = Eigen::Matrix3f::Zero();
-  Eigen::Matrix3f K = Eigen::Matrix3f::Zero();
+  Matrix3f sigma_xi = Matrix3f::Zero();
+  Matrix3f K = Matrix3f::Zero();
   Vector3f u = Vector3f::Zero();
-  Vector3f 
   float s = 0.0; 
-    for (int i = 0; i <= candidate_poses_.size(); i++) {
-      Vector3f xi[candidate_poses_[i].loc.x(), candidate_poses_[i].loc.y(), candidate_poses_[i].angle];
-      K += xi * xi.transpose() * candidate_poses_[i].log_likelihood;
-      u += xi * candidate_poses_[i].log_likelihood;
-      s += candidate_poses_[i].log_likelihood;
+    for (auto pose : candidate_poses_) {
+      Vector3f xi(pose.loc.x(), pose.loc.y(), pose.angle);
+      K += xi * xi.transpose() * pose.log_likelihood;
+      u += xi * pose.log_likelihood;
+      s += pose.log_likelihood;
       sigma_xi += (1/s)*K - (1/(pow(s,2)))*u*u.transpose();
     }
   covariances_.push_back(sigma_xi);
