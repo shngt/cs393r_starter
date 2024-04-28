@@ -5,7 +5,13 @@ RUN apt-get update && \
     apt-get install -y git libgflags-dev libpopt-dev \
                        libgoogle-glog-dev liblua5.1-0-dev \
                        libboost-all-dev libqt5websockets5-dev \
-                       python-is-python3 libeigen3-dev sudo tmux
+                       python-is-python3 libeigen3-dev software-properties-common \
+                       sudo tmux
+                       
+
+RUN add-apt-repository ppa:borglab/gtsam-release-4.0 && \
+    apt-get update && \
+    apt-get install -y libgtsam-dev libgtsam-unstable-dev
 
 # install ros apt deps
 RUN apt-get install -y ros-noetic-tf ros-noetic-angles
@@ -19,7 +25,8 @@ RUN rosdep update
 # clone deps
 RUN git clone https://github.com/ut-amrl/amrl_maps.git && \
     git clone https://github.com/ut-amrl/amrl_msgs.git && \
-    git clone https://github.com/ut-amrl/ut_automata.git --recurse-submodules
+    git clone https://github.com/ut-amrl/ut_automata.git --recurse-submodules && \
+    git clone https://github.com/borglab/gtsam.git
 
 # set up .bashrc
 RUN echo "source /opt/ros/noetic/setup.sh\n" \
@@ -37,6 +44,7 @@ RUN echo "source /opt/ros/noetic/setup.bash\n" \
 # build deps
 RUN /bin/bash -lc "cd amrl_msgs && make"
 RUN /bin/bash -lc "cd ut_automata && make"
+# RUN /bin/bash -lc "cd gtsam && mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j4"
 
 # add launcher
 ENV CS393R_DOCKER_CONTEXT 1

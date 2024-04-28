@@ -35,6 +35,8 @@
 #include "vector_map/vector_map.h"
 #include <gtsam/geometry/Pose2.h>
 
+#include "gtsam/geometry/Pose2.h"
+
 using namespace math_util;
 using Eigen::Affine2f;
 using Eigen::Rotation2Df;
@@ -82,7 +84,7 @@ void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
 
 void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
   Pose best_pose = {{0, 0}, 0, -std::numeric_limits<float>::infinity()};
-  for (const Pose& pose : candidate_poses_) {
+  for (Pose& pose : candidate_poses_) {
     // Run CSM algorithm to align the point cloud to the pose.
     // Update best_pose if the new pose is better.
     float pose_observation_log_likelihood = 0;

@@ -32,7 +32,7 @@ docker_build:
 	docker build --build-arg HOST_UID=$(shell id -u) -t cs393r_starter .
 
 docker_build_q:
-	docker build -q --build-arg HOST_UID=$(shell id -u) -t cs393r_starter .
+	docker build --build-arg HOST_UID=$(shell id -u) -t cs393r_starter .
 
 # Sets the build type to Debug.
 set_debug:

@@ -24,6 +24,9 @@ SET(ROS_BUILD_SHARED_LIBS false)
 MESSAGE(STATUS "ROS-Overrride Build Type: ${CMAKE_BUILD_TYPE}")
 MESSAGE(STATUS "CXX Flags: ${CMAKE_CXX_FLAGS}")
 
+find_package(GTSAM REQUIRED) # Uses installed package
+include_directories(${GTSAM_INCLUDE_DIR})
+
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
@@ -45,8 +48,7 @@ INCLUDE_DIRECTORIES(${GTSAM_INCLUDE_DIR})
 ROSBUILD_ADD_EXECUTABLE(slam
                         src/slam/slam_main.cc
                         src/slam/slam.cc)
-                        
-TARGET_LINK_LIBRARIES(slam shared_library ${libs})
+TARGET_LINK_LIBRARIES(slam shared_library gtsam ${libs})
 
 
 ROSBUILD_ADD_EXECUTABLE(particle_filter
