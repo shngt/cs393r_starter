@@ -37,7 +37,6 @@ namespace navigation {
 
 struct PathOption {
   float curvature = 0;
-  bool reverse = false;
   float clearance = 10;
   float free_path_length = 100;
   Eigen::Vector2f obstruction = Eigen::Vector2f::Zero();
@@ -137,9 +136,6 @@ class Navigation {
   float nav_goal_angle_;
   // Map of the environment.
   vector_map::VectorMap map_;
-
-  // Planned path from current location to goal.
-  std::vector<Eigen::Vector2f> nav_path_;
 
   // robot config
   NavigationParams robot_config_;

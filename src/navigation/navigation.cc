@@ -35,7 +35,6 @@
 #include "visualization/visualization.h"
 #include "path_options.h"
 #include "latency_compensation.h"
-#include "global_planner.h"
 
 using Eigen::Vector2f;
 using amrl_msgs::AckermannCurvatureDriveMsg;
@@ -73,8 +72,7 @@ Navigation::Navigation(const string& map_name, ros::NodeHandle* n) :
     nav_complete_(true),
     nav_goal_loc_(0, 0),
     nav_goal_angle_(0),
-    nav_path_(vector<Vector2f>({Vector2f(0, 0), Vector2f(0, 0)})),
-    latency_compensation_(new LatencyCompensation(0, 0, 0))
+    latency_compensation_(new LatencyCompensation(0, 0, 0)) 
   {
   map_.Load(GetMapFileFromName(map_name));
   drive_pub_ = n->advertise<AckermannCurvatureDriveMsg>(
@@ -88,15 +86,6 @@ Navigation::Navigation(const string& map_name, ros::NodeHandle* n) :
 }
 
 void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
-  // visualization::ClearVisualizationMsg(local_viz_msg_);
-  // printf("Current position is (%f, %f) angle %f\n", robot_loc_.x(), robot_loc_.y(), robot_angle_);
-  // printf("Setting navigation goal to (%f, %f) angle %f\n", loc.x(), loc.y(), angle);
-  // Clear previous path
-  nav_path_.clear();
-  nav_goal_loc_ = loc;
-  nav_goal_angle_ = angle;
-  nav_complete_ = false;
-  PlanPath(robot_loc_, nav_goal_loc_, map_, nav_path_);
 }
 
 void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
@@ -165,90 +154,18 @@ void Navigation::Run() {
   // Eventually, you will have to set the control values to issue drive commands:
   // drive_msg_.curvature = ...;
   // drive_msg_.velocity = ...;
+  float current_speed = robot_vel_.norm();
   // cout << current_speed << endl;
   // distance_traveled_ += current_speed * robot_config_.dt;
   // float dist_to_go = (10 - distance_traveled_); // hard code to make it go 10 forward
   // float cmd_vel = run1DTimeOptimalControl(dist_to_go, current_speed, robot_config_);
 
-  // Check whether new navigation plan is needed based on goal
-  // if (nav_complete_) {
-  //   return;
-  // }
-
-  // Check if the robot is within a certain distance of the goal
-  if ((nav_goal_loc_ - robot_loc_).norm() < 0.5) {
-    nav_complete_ = true;
-  }
-
-  // If navigation is complete, stop the robot
-  if (nav_complete_) {
-    drive_msg_.velocity = 0;
-    drive_msg_.curvature = 0;
-    drive_pub_.publish(drive_msg_);
-    return;
-  }
-
-  // Go through edges in reverse and check if the robot is within a certain distance of the edge
-  bool on_path = false;
-  // printf("Nav path size: %lu\n", nav_path_.size());
-  for (size_t i = nav_path_.size() - 1; i > 0; i--) {
-    Vector2f edge_start = nav_path_[i - 1];
-    Vector2f edge_end = nav_path_[i];
-    Vector2f projected_point = geometry::ProjectPointOntoLineSegment(robot_loc_, edge_start, edge_end);
-    float dist = (projected_point - robot_loc_).norm();
-    if (dist < 0.1) {
-      on_path = true;
-      break;
-    }
-  }
-  // printf("On path: %d\n", on_path);
-  // If the robot is not on the path, replan
-  if (!on_path) {
-    nav_path_.clear();
-    PlanPath(robot_loc_, nav_goal_loc_, map_, nav_path_);
-  }
-
-  // Set circle radius for carrot following
-  float carrot_radius = 0.5;
-  visualization::DrawArc(robot_loc_, carrot_radius, 0, M_2PI, 0xFF0000, global_viz_msg_);
-  Vector2f carrot_point = Vector2f(INFINITY, INFINITY);
-  Vector2f carrot_point_robot = Vector2f(INFINITY, INFINITY);
-  // Find point on path which intersects with circle
-  for (size_t i = 0; i < nav_path_.size() - 1; i++) {
-    Vector2f edge_start = nav_path_[i];
-    Vector2f edge_end = nav_path_[i + 1];
-    float carrot_distance = INFINITY;
-    if (geometry::FurthestFreePointCircle(edge_start, edge_end, robot_loc_, carrot_radius, &carrot_distance, &carrot_point)) {
-      // World to local frame transformation
-      visualization::DrawCross(carrot_point, 0.1, 0xFF0000, global_viz_msg_);
-      Eigen::Matrix3f world_T_local = Eigen::Matrix3f::Identity();
-      world_T_local.block<2, 1>(0, 2) = robot_loc_;
-      world_T_local.block<2, 2>(0, 0) << cos(robot_angle_), sin(robot_angle_), -sin(robot_angle_), cos(robot_angle_);
-      carrot_point_robot = world_T_local.block<2, 2>(0, 0) * (carrot_point - robot_loc_);
-      visualization::DrawCross(carrot_point_robot, 0.1, 0x00FF00, local_viz_msg_);
-      break;
-      // Transform carrot point to robot frame
-      // float carrot_point_robot_frame_x = carrot_point.x() * cos(robot_angle_) + carrot_point.y() * sin(robot_angle_) - robot_loc_.x();
-      // float carrot_point_robot_frame_y = -1 * carrot_point.x() * sin(robot_angle_) + carrot_point.y() * cos(robot_angle_) - robot_loc_.y();
-    }
-    // Vector2f closest_point = geometry::ProjectPointOntoLineSegment(robot_loc_, edge_start, edge_end);
-    // float dist = (closest_point - robot_loc_).norm();
-    // if (dist > carrot_distance) {
-    //   Vector2f direction = (closest_point - robot_loc_).normalized();
-    //   Vector2f carrot_point = robot_loc_ + carrot_distance * direction;
-    //   nav_path_.insert(nav_path_.begin() + i + 1, carrot_point);
-    //   break;
-    // }
-  }
-
-  float current_speed = robot_vel_.norm();
-
-  vector<PathOption> path_options = samplePathOptions(61, point_cloud_, robot_config_);
-  int best_path = selectPath(path_options, carrot_point_robot);
+  vector<PathOption> path_options = samplePathOptions(31, point_cloud_, robot_config_);
+  int best_path = selectPath(path_options);
 
   drive_msg_.curvature = path_options[best_path].curvature;
-  drive_msg_.velocity = run1DTimeOptimalControl(path_options[best_path].free_path_length, current_speed, path_options[best_path].reverse, robot_config_);
-	// printf("Curvature: %f, Velocity: %f\n", drive_msg_.curvature, drive_msg_.velocity);
+  drive_msg_.velocity = run1DTimeOptimalControl(path_options[best_path].free_path_length, current_speed, robot_config_);
+	
   // cout << drive_msg_.curvature << " " << drive_msg_.velocity << endl;
 
   // visualization here
@@ -256,24 +173,10 @@ void Navigation::Run() {
       robot_config_.length, robot_config_.width, 0, 0x00FF00, local_viz_msg_);
   // Draw all path options in blue
   for (unsigned int i = 0; i < path_options.size(); i++) {
-      visualization::DrawPathOption(
-        path_options[i].curvature, 
-        path_options[i].free_path_length, 
-        0, 
-        0x0000FF, 
-        false, 
-        path_options[i].reverse,
-        local_viz_msg_);
+      visualization::DrawPathOption(path_options[i].curvature, path_options[i].free_path_length, 0, 0x0000FF, false, local_viz_msg_);
   }
   // Draw the best path in red
-  visualization::DrawPathOption(
-    path_options[best_path].curvature, 
-    path_options[best_path].free_path_length, 
-    path_options[best_path].clearance, 
-    0xFF0000, 
-    true, 
-    path_options[best_path].reverse,
-    local_viz_msg_);
+  visualization::DrawPathOption(path_options[best_path].curvature, path_options[best_path].free_path_length, path_options[best_path].clearance, 0xFF0000, true, local_viz_msg_);
 // Find the closest point in the point cloud
 
   // Plot the closest point in purple
@@ -282,12 +185,6 @@ void Navigation::Run() {
   
     
   visualization::DrawPoint(Vector2f(0, 1/path_options[best_path].curvature), 0x0000FF, local_viz_msg_);
-
-  for (size_t i = 0; i < nav_path_.size() - 1; i++) {
-    visualization::DrawPoint(nav_path_[i], 0xFF00FF, global_viz_msg_);
-    visualization::DrawPoint(nav_path_[i + 1], 0xFF00FF, global_viz_msg_);
-    visualization::DrawLine(nav_path_[i], nav_path_[i + 1], 0xFFA500, global_viz_msg_);
-  }
 
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();
