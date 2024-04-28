@@ -37,10 +37,15 @@ ADD_LIBRARY(shared_library
 ADD_SUBDIRECTORY(src/shared)
 INCLUDE_DIRECTORIES(src/shared)
 INCLUDE_DIRECTORIES(src)
+list(APPEND CMAKE_PREFIX_PATH "./gtsam/build")
+set (GTSAM_DIR "./gtsam/build")
+find_package(GTSAM REQUIRED)
+INCLUDE_DIRECTORIES(${GTSAM_INCLUDE_DIR})
 
 ROSBUILD_ADD_EXECUTABLE(slam
                         src/slam/slam_main.cc
                         src/slam/slam.cc)
+                        
 TARGET_LINK_LIBRARIES(slam shared_library ${libs})
 
 

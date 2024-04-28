@@ -33,6 +33,7 @@
 #include "slam.h"
 
 #include "vector_map/vector_map.h"
+#include <gtsam/geometry/Pose2.h>
 
 using namespace math_util;
 using Eigen::Affine2f;
