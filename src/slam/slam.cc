@@ -34,6 +34,13 @@
 
 #include "vector_map/vector_map.h"
 #include <gtsam/geometry/Pose2.h>
+#include <gtsam/nonlinear/NonlinearFactorGraph.h>
+#include <gtsam/nonlinear/Values.h>
+#include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
+#include <gtsam/slam/PriorFactor.h>
+#include <gtsam/slam/BetweenFactor.h>
+#include <gtsam/nonlinear/Marginals.h>
+#include <gtsam/linear/NoiseModel.h>
 
 using namespace math_util;
 using Eigen::Affine2f;
@@ -49,6 +56,9 @@ using std::string;
 using std::swap;
 using std::vector;
 using vector_map::VectorMap;
+using gtsam::Pose2;
+using gtsam::BetweenFactor;
+using gtsam::LevenbergMarquardtOptimizer;
 
 namespace slam {
 
@@ -72,8 +82,14 @@ SLAM::SLAM() :
     log_prob_grid_(500, vector<float>(500, 0.0)), 
     log_prob_grid_resolution_(0.02),
     log_prob_grid_origin_(Vector2f(-10, -10)),
-    log_prob_grid_initialized_(false)
+    log_prob_grid_initialized_(false),
+    graph_(gtsam::NonlinearFactorGraph()), // Vector3f(0.3, 0.3, 0.1).cast<double>()
+    initial_estimate_(gtsam::Values()),
+    pose_index_(1)
     {
+      gtsam::noiseModel::Diagonal::shared_ptr priorNoise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.0, 0.0, 0.0));
+      graph_.add(gtsam::PriorFactor<gtsam::Pose2>(1, gtsam::Pose2(0, 0, 0), priorNoise));
+      initial_estimate_.insert(1, gtsam::Pose2(0, 0, 0));
     }
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
@@ -127,6 +143,31 @@ void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
       sigma_xi += (1/s)*K - (1/(pow(s,2)))*u*u.transpose();
     }
   covariances_.push_back(sigma_xi);
+
+  // Solve for the joint solution over pose graph
+  // Add odometry factors
+  // gtsam::noiseModel::Gaussian::shared_ptr noise_model = gtsam::noiseModel::Gaussian::Covariance(sigma_xi.cast<double>()
+  //   // (gtsam::Matrix3(3, 3) << sigma_xi(0,0), sigma_xi(0,1), sigma_xi(0,2),
+  //   //                          sigma_xi(1,0), sigma_xi(1,1), sigma_xi(1,2),
+  //   //                          sigma_xi(2,0), sigma_xi(2,1), sigma_xi(2,2))
+  // );
+  gtsam::noiseModel::Diagonal::shared_ptr model = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.2, 0.2, 0.1));
+  Pose2 pose1 = Pose2(best_pose.loc.x(), best_pose.loc.y(), best_pose.angle);
+  pose_index_++;
+  pose_history_.push_back(pose1);
+  graph_.add(BetweenFactor<Pose2>(pose_index_ - 1, pose_index_, pose1.between(pose_history_.back()), model));
+
+  // optimize using Levenberg-Marquardt optimization
+  initial_estimate_.insert(pose_index_, pose1);
+  result_ = LevenbergMarquardtOptimizer(graph_, initial_estimate_).optimize();
+  result_.print("Final Result:\n");
+
+  // // Estimate pairwise non-succesive poses
+  // for (int i = 2; i <= candidate_poses_.size(); i++) {
+  //   for(int j = 1; j<=i-1; j++){
+
+  //   }
+  // }
 }
 
 void SLAM::ObserveLaser(const vector<float>& ranges,

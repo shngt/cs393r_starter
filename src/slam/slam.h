@@ -24,6 +24,12 @@
 
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
+#include <gtsam/nonlinear/NonlinearFactorGraph.h>
+#include <gtsam/nonlinear/Values.h>
+#include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
+#include <gtsam/slam/PriorFactor.h>
+#include <gtsam/slam/BetweenFactor.h>
+#include <gtsam/geometry/Pose2.h>
 
 #ifndef SRC_SLAM_H_
 #define SRC_SLAM_H_
@@ -104,6 +110,21 @@ class SLAM {
 
   // For convariance calcular
   std::vector<Eigen::Matrix3f> covariances_;
+
+  // Nonlinear factor graph
+  gtsam::NonlinearFactorGraph graph_;
+
+   // History of calculated poses
+  std::vector<gtsam::Pose2> pose_history_;
+
+  // Create initial estimate to the solution
+  gtsam::Values initial_estimate_;
+
+  // Optimization results
+  gtsam::Values result_;
+
+  // Pose index for optimization
+  int pose_index_;
 };
 }  // namespace slam
 
