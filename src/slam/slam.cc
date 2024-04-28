@@ -178,28 +178,27 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // A new laser scan has been observed. Decide whether to add it as a pose
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
-  if (!apply_new_scan_ || (odom_initialized_ && log_prob_grid_initialized_)) {
+  if (!apply_new_scan_ && (!odom_initialized_ || log_prob_grid_initialized_)) {
     return;
   }
+
   apply_new_scan_ = false;
 
   vector<Vector2f> point_cloud(ranges.size());
   const float angle_increment = (angle_max - angle_min) / ranges.size();
   // save the pointcloud in the robot's frame
-  point_cloud.clear();
+  std::fill(point_cloud.begin(), point_cloud.end(), Vector2f(0, 0));
   for (size_t i = 0; i < ranges.size(); i++) {
-    if (ranges[i] > range_min && ranges[i] < range_max) {
       const float angle = angle_min + i * angle_increment;
       Vector2f point(ranges[i] * cos(angle), 0.2 + ranges[i] * sin(angle));
       point_cloud[i] = point;
-    }
   }
-
   // Run CSM to align the point cloud to the last saved pose
   RunCSM(point_cloud);
 
   // Transform the point cloud to the estimated pose and add to map
   for (size_t i = 0; i < point_cloud.size(); i++) {
+    // printf("point added to map\n");
     map_.push_back(Rotation2Df(estimated_angle_) * point_cloud[i] + estimated_loc_);
   }
 
@@ -313,10 +312,15 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
 }
 
 vector<Vector2f> SLAM::GetMap() {
-  vector<Vector2f> map;
   // Reconstruct the map as a single aligned point cloud from all saved poses
   // and their respective scans.
-  return map;
+  // Subsample 5000 points from the map and return
+  int step = ceil((float) map_.size() / 5000);
+  vector<Vector2f> subsampled_map;
+  for (size_t i = 0; i < map_.size(); i += step) {
+    subsampled_map.push_back(map_[i]);
+  }
+  return subsampled_map;
 }
 
 }  // namespace slam
