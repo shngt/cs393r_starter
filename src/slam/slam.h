@@ -114,8 +114,14 @@ class SLAM {
   // Nonlinear factor graph
   gtsam::NonlinearFactorGraph graph_;
 
-   // History of calculated poses
+  // History of odometry-reported poses
+  std::vector<Pose> odometry_pose_history_;
+
+  // History of calculated poses
   std::vector<gtsam::Pose2> pose_history_;
+
+  // History of point clouds
+  std::vector<std::vector<Eigen::Vector2f>> point_cloud_history_;
 
   // Create initial estimate to the solution
   gtsam::Values initial_estimate_;
