@@ -132,8 +132,8 @@ void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
   }
   printf("Best Pose: (%f, %f, %f)\n", best_pose.loc.x(), best_pose.loc.y(), best_pose.angle);
 
-  // Save pose history from candidate poses
-  pose_history_.push_back(best_pose);
+  // Extract best pose location and angle and add to pose history
+  pose_history_.push_back({best_pose.loc.x(), best_pose.loc.y(), best_pose.angle});
 
   // Save the best pose as the new estimated pose.
   estimated_loc_ = best_pose.loc;
@@ -163,19 +163,34 @@ void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
   // gtsam::noiseModel::Diagonal::shared_ptr model = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.2, 0.2, 0.1));
   Pose2 pose1 = Pose2(best_pose.loc.x(), best_pose.loc.y(), best_pose.angle);
   pose_index_++;
-  graph_.add(BetweenFactor<Pose2>(pose_index_ - 1, pose_index_, pose1.between(pose_history_.back()), noise_model));
+  graph_.add(BetweenFactor<Pose>(pose_index_ - 1, pose_index_, pose1, noise_model));
+
+  // Loop through last 5 entries of pose history and add factors
+  // for (int i = 1; i <= 5; i++) {
+  //   if (pose_history_.size() >= i) {
+  //     Pose2 pose2 = Pose2(pose_history_[pose_history_.size() - i].loc.x(), pose_history_[pose_history_.size() - i].loc.y(), pose_history_[pose_history_.size() - i].angle);
+  //     // should be relative pose if i > 1
+  //     if(i>1){
+  //       graph_.add(BetweenFactor<Pose>(pose_index_ - i, pose_index_, pose2.between(pose_history_[pose_history_.size() - i]), noise_model));
+  //     }
+
+  //     else{
+  //       graph_.add(BetweenFactor<Pose>(pose_index_ - i, pose_index_, pose2.between(pose_history_.back()), noise_model));
+  //     }      
+  //   }
+  // }
 
   // optimize using Levenberg-Marquardt optimization
   initial_estimate_.insert(pose_index_, pose1);
   result_ = LevenbergMarquardtOptimizer(graph_, initial_estimate_).optimize();
   result_.print("Final Result:\n");
   // if (pose_index_ == 5) exit(0);
-  // // Estimate pairwise non-succesive poses
-  // for (int i = 2; i <= candidate_poses_.size(); i++) {
-  //   for(int j = 1; j<=i-1; j++){
+  // Estimate pairwise non-succesive poses
+  for (int i = 2; i <= candidate_poses_.size(); i++) {
+    for(int j = 1; j<=i-1; j++){
 
-  //   }
-  // }
+    }
+  }
 }
 
 void SLAM::ObserveLaser(const vector<float>& ranges,
@@ -252,7 +267,8 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   
 }
 
-void SLAM::PredictMotionModel(const Vector2f& odom_loc, const float odom_angle, Vector2f current_pose_loc, float current_pose_angle){
+// replace with location difference and angle difference
+void SLAM::PredictMotionModel(const float loc_diff, const float angle_diff, Vector2f current_pose_loc, float current_pose_angle){
   // static CumulativeFunctionTimer function_timer_(__FUNCTION__);
   // CumulativeFunctionTimer::Invocation invoke(&function_timer_);   
   // The very first callback goes here
@@ -264,15 +280,6 @@ void SLAM::PredictMotionModel(const Vector2f& odom_loc, const float odom_angle, 
 
   printf("Current pose from PredictMotionModel: (%f, %f, %f)\n", current_pose_loc.x(), current_pose_loc.y(), current_pose_angle);
 
-  Vector2f loc_delta =
-    Rotation2Df(-prev_odom_angle_) * (odom_loc - prev_odom_loc_);
-  float angle_delta = odom_angle - prev_odom_angle_;
-
-  prev_odom_angle_ = odom_angle;
-  prev_odom_loc_ = odom_loc;
-
-  float angle_diff = fabs(angle_delta - M_2PI * floor(angle_delta / M_2PI + 0.5));
-  float loc_diff = loc_delta.norm();
   float angle_stddev = K1_ * angle_diff + K2_ * loc_diff;
   float loc_stddev = K3_ * angle_diff + K4_ * loc_diff;
 
@@ -326,7 +333,13 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   // poses.
   // printf("Previous Odom from ObserveOdometry: (%f, %f, %f)\n", prev_odom_loc_.x(), prev_odom_loc_.y(), prev_odom_angle_);
   Vector2f odom_diff = odom_loc - prev_odom_loc_;
-  float angle_diff = AngleDiff(odom_angle, prev_odom_angle_);
+    // Calculate the difference between the odometry and the predicted motion model
+  Vector2f loc_delta = Rotation2Df(-prev_odom_angle_) * (odom_loc - prev_odom_loc_);
+  float angle_delta = odom_angle - prev_odom_angle_;
+
+  float loc_diff = loc_delta.norm();
+  float angle_diff = fabs(angle_delta - M_2PI * floor(angle_delta / M_2PI + 0.5));
+  // float angle_diff = AngleDiff(odom_angle, prev_odom_angle_);
 
   // Save previous odom poses
   odometry_pose_history_.push_back({odom_loc, odom_angle});
@@ -337,9 +350,12 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   Vector2f projected_loc = estimated_loc_ + Rotation2Df(estimated_angle_ - prev_odom_angle_) * odom_diff;
   float projected_angle = AngleMod(estimated_angle_ + angle_diff);
 
+  prev_odom_angle_ = odom_angle;
+  prev_odom_loc_ = odom_loc;
+
   if (dist > loc_threshold_ || fabs(angle_diff) > angle_threshold_) {
     // Update the candidate poses based on the odometry
-    PredictMotionModel(odom_loc, odom_angle, projected_loc, projected_angle);
+    PredictMotionModel(loc_diff, angle_diff, projected_loc, projected_angle);
     // Set flag to add new scan
     apply_new_scan_ = true;
     prev_odom_angle_ = odom_angle;
