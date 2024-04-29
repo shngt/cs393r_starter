@@ -131,6 +131,10 @@ void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
     }
   }
   printf("Best Pose: (%f, %f, %f)\n", best_pose.loc.x(), best_pose.loc.y(), best_pose.angle);
+
+  // Save pose history from candidate poses
+  pose_history_.push_back(best_pose);
+
   // Save the best pose as the new estimated pose.
   estimated_loc_ = best_pose.loc;
   estimated_angle_ = best_pose.angle;
@@ -159,7 +163,6 @@ void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
   // gtsam::noiseModel::Diagonal::shared_ptr model = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.2, 0.2, 0.1));
   Pose2 pose1 = Pose2(best_pose.loc.x(), best_pose.loc.y(), best_pose.angle);
   pose_index_++;
-  pose_history_.push_back(pose1);
   graph_.add(BetweenFactor<Pose2>(pose_index_ - 1, pose_index_, pose1.between(pose_history_.back()), noise_model));
 
   // optimize using Levenberg-Marquardt optimization
@@ -200,6 +203,10 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
       Vector2f point(ranges[i] * cos(angle) + 0.2, ranges[i] * sin(angle));
       point_cloud[i] = point;
   }
+
+  // Save point cloud history
+  point_cloud_history_.push_back(point_cloud);
+
   // Run CSM to align the point cloud to the last saved pose
   RunCSM(point_cloud);
   
@@ -300,7 +307,8 @@ void SLAM::PredictMotionModel(const Vector2f& odom_loc, const float odom_angle, 
 				candidate_poses_[idx] = {{x_pose, y_pose}, theta_pose, log_likelihood};
         // printf("Candidate Pose: (%f, %f, %f), with log likelihood %f\n", 
         //   candidate_poses_[idx].loc.x(), candidate_poses_[idx].loc.y(), candidate_poses_[idx].angle, candidate_poses_[idx].log_likelihood);
-			}
+        
+      }
 		}
 	}
 }
@@ -319,6 +327,10 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   // printf("Previous Odom from ObserveOdometry: (%f, %f, %f)\n", prev_odom_loc_.x(), prev_odom_loc_.y(), prev_odom_angle_);
   Vector2f odom_diff = odom_loc - prev_odom_loc_;
   float angle_diff = AngleDiff(odom_angle, prev_odom_angle_);
+
+  // Save previous odom poses
+  odometry_pose_history_.push_back({odom_loc, odom_angle});
+
   printf("Odom Diff: (%f, %f, %f)\n", odom_diff.x(), odom_diff.y(), angle_diff);
   float dist = odom_diff.norm();
 
