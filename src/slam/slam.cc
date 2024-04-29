@@ -133,7 +133,7 @@ void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
   printf("Best Pose: (%f, %f, %f)\n", best_pose.loc.x(), best_pose.loc.y(), best_pose.angle);
 
   // Extract best pose location and angle and add to pose history
-  pose_history_.push_back({best_pose.loc.x(), best_pose.loc.y(), best_pose.angle});
+  pose_history_.push_back(Pose2(best_pose.loc.x(), best_pose.loc.y(), best_pose.angle));
 
   // Save the best pose as the new estimated pose.
   estimated_loc_ = best_pose.loc;
@@ -163,22 +163,24 @@ void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
   // gtsam::noiseModel::Diagonal::shared_ptr model = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.2, 0.2, 0.1));
   Pose2 pose1 = Pose2(best_pose.loc.x(), best_pose.loc.y(), best_pose.angle);
   pose_index_++;
-  graph_.add(BetweenFactor<Pose>(pose_index_ - 1, pose_index_, pose1, noise_model));
+  graph_.add(BetweenFactor<Pose2>(pose_index_ - 1, pose_index_, pose1, noise_model));
 
   // Loop through last 5 entries of pose history and add factors
-  // for (int i = 1; i <= 5; i++) {
-  //   if (pose_history_.size() >= i) {
-  //     Pose2 pose2 = Pose2(pose_history_[pose_history_.size() - i].loc.x(), pose_history_[pose_history_.size() - i].loc.y(), pose_history_[pose_history_.size() - i].angle);
-  //     // should be relative pose if i > 1
-  //     if(i>1){
-  //       graph_.add(BetweenFactor<Pose>(pose_index_ - i, pose_index_, pose2.between(pose_history_[pose_history_.size() - i]), noise_model));
-  //     }
+  int pose_history_size = (int)pose_history_.size();
 
-  //     else{
-  //       graph_.add(BetweenFactor<Pose>(pose_index_ - i, pose_index_, pose2.between(pose_history_.back()), noise_model));
-  //     }      
-  //   }
-  // }
+  for (int i = 1; i <= 5; i++) {
+    if (pose_history_size >= i) {
+      Pose2 pose2 = pose_history_[pose_history_size - i];
+      // should be relative pose if i > 1
+      if(i>1){
+        graph_.add(BetweenFactor<Pose2>(pose_index_ - i, pose_index_, pose2.between(pose_history_[pose_history_size - i]), noise_model));
+      }
+
+      else{
+        graph_.add(BetweenFactor<Pose2>(pose_index_ - i, pose_index_, pose2.between(pose_history_.back()), noise_model));
+      }      
+    }
+  }
 
   // optimize using Levenberg-Marquardt optimization
   initial_estimate_.insert(pose_index_, pose1);
@@ -186,11 +188,6 @@ void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
   result_.print("Final Result:\n");
   // if (pose_index_ == 5) exit(0);
   // Estimate pairwise non-succesive poses
-  for (int i = 2; i <= candidate_poses_.size(); i++) {
-    for(int j = 1; j<=i-1; j++){
-
-    }
-  }
 }
 
 void SLAM::ObserveLaser(const vector<float>& ranges,
@@ -230,7 +227,6 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
   // Transform the point cloud to the estimated pose and add to map
   for (size_t i = 0; i < point_cloud.size(); i++) {
-    // printf("point added to map\n");
     map_.push_back(Rotation2Df(estimated_angle_) * point_cloud[i] + estimated_loc_);
   }
 
@@ -238,9 +234,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // Iterate over all points in the point cloud and update the log probability
   for (const Vector2f& point : point_cloud) {
     // Get index of point in log probability grid
-    // printf("Point: (%f, %f)\n", point.x(), point.y());
     Vector2f grid_point = (point - log_prob_grid_origin_) / log_prob_grid_resolution_;
-    // printf("Grid Point: (%f, %f)\n", grid_point.x(), grid_point.y());
     int max_offset = 30 * 0.02 / log_prob_grid_resolution_;
     // Iterate over all points in the log probability grid within max_offset of grid_point
     for (int x_offset = -max_offset; x_offset <= max_offset; x_offset++) {
@@ -249,10 +243,8 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
         if (x >= 0 && x < (int) log_prob_grid_.size() && y >= 0 && y < (int) log_prob_grid_[0].size()) {
           float x_dist = x_offset * log_prob_grid_resolution_;
           float y_dist = y_offset * log_prob_grid_resolution_;
-          // printf("X Dist: %f, Y Dist: %f\n", x_dist, y_dist);
           float dist = sqrt(x_dist * x_dist + y_dist * y_dist);
           float log_prob = -dist * dist / (2 * 0.01 * 0.01);
-          // printf("Log Prob: %f\n", log_prob);
           log_prob_grid_[x][y] = std::max(log_prob_grid_[x][y], log_prob);
         }
       }
@@ -268,7 +260,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 }
 
 // replace with location difference and angle difference
-void SLAM::PredictMotionModel(const float loc_diff, const float angle_diff, Vector2f current_pose_loc, float current_pose_angle){
+void SLAM::PredictMotionModel(float loc_diff, float angle_diff, Vector2f current_pose_loc, float current_pose_angle){
   // static CumulativeFunctionTimer function_timer_(__FUNCTION__);
   // CumulativeFunctionTimer::Invocation invoke(&function_timer_);   
   // The very first callback goes here
@@ -342,7 +334,7 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   // float angle_diff = AngleDiff(odom_angle, prev_odom_angle_);
 
   // Save previous odom poses
-  odometry_pose_history_.push_back({odom_loc, odom_angle});
+  odometry_pose_history_.push_back({odom_loc, odom_angle, 0.0});
 
   printf("Odom Diff: (%f, %f, %f)\n", odom_diff.x(), odom_diff.y(), angle_diff);
   float dist = odom_diff.norm();

@@ -57,7 +57,7 @@ class SLAM {
                     float angle_min,
                     float angle_max);
 
-  void PredictMotionModel(const Eigen::Vector2f& odom_loc, const float odom_angle, Eigen::Vector2f current_pose_loc, float current_pose_angle);
+  void PredictMotionModel(float loc_diff, float angle_diff, Eigen::Vector2f current_pose_loc, float current_pose_angle);
 
   // Observe new odometry-reported location.
   void ObserveOdometry(const Eigen::Vector2f& odom_loc,
