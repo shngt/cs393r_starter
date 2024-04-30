@@ -48,7 +48,10 @@ class SLAM {
   SLAM();
 
   // Run CSM on the given point cloud
-  void RunCSM(const std::vector<Eigen::Vector2f>& point_cloud);
+  void RunCSM(const std::vector<Eigen::Vector2f>& point_cloud, const Eigen::Vector2f& old_loc, const float old_angle, const std::vector<std::vector<float>>& old_log_prob_grid,
+    std::vector<Pose>& candidate_poses, Eigen::Matrix3f& covariance, gtsam::Pose2& new_pose);
+
+  void ConstructLogProbGrid(const std::vector<Eigen::Vector2f>& point_cloud);
 
   // Run optimization with passed covariance matrix
   void OptimizeGraph(const std::vector<Eigen::Matrix3f>& covariances);
@@ -60,8 +63,8 @@ class SLAM {
                     float angle_min,
                     float angle_max);
 
- std::vector<Pose> PredictMotionModel(float loc_diff, float angle_diff, Eigen::Vector2f current_pose_loc, float current_pose_angle);
-
+//  std::vector<Pose> PredictMotionModel(float loc_diff, float angle_diff, Eigen::Vector2f current_pose_loc, float current_pose_angle);
+  void PredictMotionModel(const Eigen::Vector2f& old_odom_loc, const float old_odom_angle, const Eigen::Vector2f& old_pose_loc, const float old_pose_angle, std::vector<slam::Pose>& candidate_poses);
   // Observe new odometry-reported location.
   void ObserveOdometry(const Eigen::Vector2f& odom_loc,
                        const float odom_angle);
@@ -99,11 +102,8 @@ class SLAM {
   float y_freq_;
   float theta_freq_;
 
-  // All possible candidate poses from motion model
-  std::vector<Pose> candidate_poses_;
-
   // Log probability grid for CSM
-  std::vector<std::vector<float>> log_prob_grid_;
+  // std::vector<std::vector<float>> log_prob_grid_;
   float log_prob_grid_resolution_;
   Eigen::Vector2f log_prob_grid_origin_;
   bool log_prob_grid_initialized_;
@@ -118,7 +118,7 @@ class SLAM {
   gtsam::NonlinearFactorGraph graph_;
 
   // History of log_prob_grid
-  std::vector<std::vector<float>> log_prob_grid_history_;
+  std::vector<std::vector<std::vector<float>>> log_prob_grid_history_;
   
   // History of odometry-reported poses
   std::vector<Pose> odometry_pose_history_;
@@ -127,7 +127,7 @@ class SLAM {
   std::vector<gtsam::Pose2> pose_history_;
 
   // History of point clouds
-  std::vector<std::vector<Eigen::Vector2f>> point_cloud_history_;
+  // std::vector<std::vector<Eigen::Vector2f>> point_cloud_history_;
 
   // Create initial estimate to the solution
   gtsam::Values initial_estimate_;
