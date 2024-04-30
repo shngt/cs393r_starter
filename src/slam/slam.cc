@@ -98,7 +98,7 @@ void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
   *angle = estimated_angle_;
 }
 
-void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
+Eigen::Matrix3f SLAM::RunCSM(const vector<Vector2f>& point_cloud, ) {
   Pose best_pose = {{0, 0}, 0, -std::numeric_limits<float>::infinity()};
   for (Pose& pose : candidate_poses_) {
     // Run CSM algorithm to align the point cloud to the pose.
@@ -153,41 +153,7 @@ void SLAM::RunCSM(const vector<Vector2f>& point_cloud) {
     }
   covariances_.push_back(sigma_xi);
 
-  // Solve for the joint solution over pose graph
-  // Add odometry factors
-  gtsam::noiseModel::Gaussian::shared_ptr noise_model = gtsam::noiseModel::Gaussian::Covariance(sigma_xi.cast<double>());
-  //   // (gtsam::Matrix3(3, 3) << sigma_xi(0,0), sigma_xi(0,1), sigma_xi(0,2),
-  //   //                          sigma_xi(1,0), sigma_xi(1,1), sigma_xi(1,2),
-  //   //                          sigma_xi(2,0), sigma_xi(2,1), sigma_xi(2,2))
-  // );
-  // gtsam::noiseModel::Diagonal::shared_ptr model = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.2, 0.2, 0.1));
-  Pose2 pose1 = Pose2(best_pose.loc.x(), best_pose.loc.y(), best_pose.angle);
-  pose_index_++;
-  graph_.add(BetweenFactor<Pose2>(pose_index_ - 1, pose_index_, pose1, noise_model));
-
-  // Loop through last 5 entries of pose history and add factors
-  int pose_history_size = (int)pose_history_.size();
-
-  for (int i = 1; i <= 5; i++) {
-    if (pose_history_size >= i) {
-      Pose2 pose2 = pose_history_[pose_history_size - i];
-      // should be relative pose if i > 1
-      if(i>1){
-        graph_.add(BetweenFactor<Pose2>(pose_index_ - i, pose_index_, pose2.between(pose_history_[pose_history_size - i]), noise_model));
-      }
-
-      else{
-        graph_.add(BetweenFactor<Pose2>(pose_index_ - i, pose_index_, pose2.between(pose_history_.back()), noise_model));
-      }      
-    }
-  }
-
-  // optimize using Levenberg-Marquardt optimization
-  initial_estimate_.insert(pose_index_, pose1);
-  result_ = LevenbergMarquardtOptimizer(graph_, initial_estimate_).optimize();
-  result_.print("Final Result:\n");
-  // if (pose_index_ == 5) exit(0);
-  // Estimate pairwise non-succesive poses
+  return covariances_;
 }
 
 void SLAM::ObserveLaser(const vector<float>& ranges,
@@ -219,8 +185,44 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // Save point cloud history
   point_cloud_history_.push_back(point_cloud);
 
+  // For loop to iterate over the previous point clouds
+  for(int i = 1; i<= point_cloud_history_.size(); i++){
+    // Get previous point cloud from point_cloud_history_
+    vector<Vector2f> prev_point_cloud = point_cloud_history_[point_cloud_history_.size() - i];
+    
+    // Get corresponding odometry pose from odometry_pose_history_
+    Pose odom_pose = odometry_pose_history_[odometry_pose_history_.size() - i];
+
+  // Get list of candidate poses with likelihood
+  std::vector<Pose> motion_model_likelihood = PredictMotionModel(loc_diff, angle_diff, projected_loc, projected_angle);
+
   // Run CSM to align the point cloud to the last saved pose
-  RunCSM(point_cloud);
+  covariance = RunCSM(point_cloud, previous_point_cloud, succesive_motion_model_likelihood);
+
+  // Add factor to pose graph
+  // Solve for the joint solution over pose graph
+  // Add odometry factors
+  gtsam::noiseModel::Gaussian::shared_ptr noise_model = gtsam::noiseModel::Gaussian::Covariance(sigma_xi.cast<double>());
+  //   // (gtsam::Matrix3(3, 3) << sigma_xi(0,0), sigma_xi(0,1), sigma_xi(0,2),
+  //   //                          sigma_xi(1,0), sigma_xi(1,1), sigma_xi(1,2),
+  //   //                          sigma_xi(2,0), sigma_xi(2,1), sigma_xi(2,2))
+  // );
+  // gtsam::noiseModel::Diagonal::shared_ptr model = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.2, 0.2, 0.1));
+  Pose2 pose1 = Pose2(best_pose.loc.x(), best_pose.loc.y(), best_pose.angle);
+  pose_index_++;
+  graph_.add(BetweenFactor<Pose2>(pose_index_ - 1, pose_index_, pose1, noise_model));
+
+ 
+
+  // optimize using Levenberg-Marquardt optimization
+  initial_estimate_.insert(pose_index_, pose1);
+  }
+
+  // Optimization results
+  result_ = LevenbergMarquardtOptimizer(graph_, initial_estimate_).optimize();
+  result_.print("Final Result:\n");
+  // if (pose_index_ == 5) exit(0);
+  // Estimate pairwise non-succesive poses
   
   // Print estimated location and angle
   printf("Estimated Pose: (%f, %f, %f)\n", estimated_loc_.x(), estimated_loc_.y(), estimated_angle_);
@@ -249,7 +251,9 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
         }
       }
     }
-    log_prob_grid_initialized_ = true;
+    // log_prob_grid_initialized_ = true;
+    // Logprob grid history
+    log_prob_grid_history_.push_back(log_prob_grid_);
   }
 
   apply_new_scan_ = false;
@@ -259,8 +263,8 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   
 }
 
-// replace with location difference and angle difference
-void SLAM::PredictMotionModel(float loc_diff, float angle_diff, Vector2f current_pose_loc, float current_pose_angle){
+// Function returns the candidate poses based on the motion model
+vector<Pose> SLAM::PredictMotionModel(float loc_diff, float angle_diff, Vector2f current_pose_loc, float current_pose_angle){
   // static CumulativeFunctionTimer function_timer_(__FUNCTION__);
   // CumulativeFunctionTimer::Invocation invoke(&function_timer_);   
   // The very first callback goes here
@@ -310,6 +314,8 @@ void SLAM::PredictMotionModel(float loc_diff, float angle_diff, Vector2f current
       }
 		}
 	}
+
+  return candidate_poses_;
 }
 
 void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
@@ -347,7 +353,6 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
 
   if (dist > loc_threshold_ || fabs(angle_diff) > angle_threshold_) {
     // Update the candidate poses based on the odometry
-    PredictMotionModel(loc_diff, angle_diff, projected_loc, projected_angle);
     // Set flag to add new scan
     apply_new_scan_ = true;
     prev_odom_angle_ = odom_angle;

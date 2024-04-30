@@ -50,6 +50,9 @@ class SLAM {
   // Run CSM on the given point cloud
   void RunCSM(const std::vector<Eigen::Vector2f>& point_cloud);
 
+  // Run optimization with passed covariance matrix
+  void OptimizeGraph(const std::vector<Eigen::Matrix3f>& covariances);
+
   // Observe a new laser scan.
   void ObserveLaser(const std::vector<float>& ranges,
                     float range_min,
@@ -57,7 +60,7 @@ class SLAM {
                     float angle_min,
                     float angle_max);
 
-  void PredictMotionModel(float loc_diff, float angle_diff, Eigen::Vector2f current_pose_loc, float current_pose_angle);
+ std::vector<Pose> PredictMotionModel(float loc_diff, float angle_diff, Eigen::Vector2f current_pose_loc, float current_pose_angle);
 
   // Observe new odometry-reported location.
   void ObserveOdometry(const Eigen::Vector2f& odom_loc,
@@ -114,6 +117,9 @@ class SLAM {
   // Nonlinear factor graph
   gtsam::NonlinearFactorGraph graph_;
 
+  // History of log_prob_grid
+  std::vector<std::vector<float>> log_prob_grid_history_;
+  
   // History of odometry-reported poses
   std::vector<Pose> odometry_pose_history_;
 
