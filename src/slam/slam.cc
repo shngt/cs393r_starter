@@ -97,8 +97,15 @@ SLAM::SLAM() :
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
   // Return the latest pose estimate of the robot.
-  *loc = estimated_loc_;
-  *angle = estimated_angle_;
+  if (pose_index_ <= 1) {
+    *loc = {0, 0};
+    *angle = 0;
+    return;
+  }
+  Pose2 pose = result_.at<Pose2>(pose_index_);
+  *loc = {pose.x(), pose.y()};
+  *angle = pose.theta();
+  return;
 }
 
 void SLAM::RunCSM(
@@ -110,6 +117,8 @@ void SLAM::RunCSM(
   Eigen::Matrix3f& covariance,
   Pose2& new_pose
 ) {
+  static CumulativeFunctionTimer function_timer_(__FUNCTION__);
+  CumulativeFunctionTimer::Invocation invoke(&function_timer_);
   Pose best_pose = {{0, 0}, 0, -std::numeric_limits<float>::infinity()};
   for (Pose& pose : candidate_poses) {
     // Run CSM algorithm to align the point cloud to the pose.
@@ -168,6 +177,8 @@ void SLAM::RunCSM(
 }
 
 void SLAM::ConstructLogProbGrid(const vector<Vector2f>& point_cloud) {
+  static CumulativeFunctionTimer function_timer_(__FUNCTION__);
+  CumulativeFunctionTimer::Invocation invoke(&function_timer_);
   // Construct the log probability grid from the point cloud.
   // Iterate over all points in the point cloud and update the log probability
   // grid.
@@ -190,14 +201,36 @@ void SLAM::ConstructLogProbGrid(const vector<Vector2f>& point_cloud) {
   log_prob_grid_history_.push_back(log_prob_grid);
 }
 
-void SLAM::ObserveLaser(const vector<float>& ranges,
-                        float range_min,
-                        float range_max,
-                        float angle_min,
-                        float angle_max) {
+void SLAM::ConstructPointCloud(const sensor_msgs::LaserScan& msg, vector<Vector2f>& point_cloud) {
+  // Construct a point cloud from the laser scan.
+  const float angle_increment = (msg.angle_max - msg.angle_min) / msg.ranges.size();
+  for (size_t i = 0; i < msg.ranges.size(); i++) {
+    if (msg.ranges[i] >= msg.range_max || msg.ranges[i] < msg.range_min) {
+      continue;
+    }
+    const float angle = msg.angle_min + i * angle_increment;
+    Vector2f point(msg.ranges[i] * cos(angle), msg.ranges[i] * sin(angle));
+    point_cloud.push_back(point);
+  }
+  // Decimate the point cloud by taking every 10th point.
+  vector<Vector2f> decimated_point_cloud;
+  DecimatePointCloud(point_cloud, decimated_point_cloud);
+  point_cloud = decimated_point_cloud;
+}
+
+void SLAM::DecimatePointCloud(const vector<Vector2f>& point_cloud, vector<Vector2f>& decimated_point_cloud) {
+  // Decimate the point cloud by taking every 10th point.
+  for (size_t i = 0; i < point_cloud.size(); i += 10) {
+    decimated_point_cloud.push_back(point_cloud[i]);
+  }
+}
+
+void SLAM::ObserveLaser(const sensor_msgs::LaserScan& msg) {
   // A new laser scan has been observed. Decide whether to add it as a pose
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
+  static CumulativeFunctionTimer function_timer_(__FUNCTION__);
+  CumulativeFunctionTimer::Invocation invoke(&function_timer_);
   // Always add first scan
   if (!odom_initialized_) {
     return;
@@ -206,18 +239,14 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
     odometry_pose_history_.push_back({prev_odom_loc_, prev_odom_angle_, 0.0});
     printf("Initializing log prob grid for the first time\n");
     vector<Vector2f> point_cloud;
-    const float angle_increment = (angle_max - angle_min) / ranges.size();
-    // save the pointcloud in the robot's frame
-    for (size_t i = 0; i < ranges.size(); i++) {
-        if (ranges[i] >= range_max || ranges[i] < range_min) {
-          continue;
-        }
-        const float angle = angle_min + i * angle_increment;
-        Vector2f point(ranges[i] * cos(angle) + 0.2, ranges[i] * sin(angle));
-        point_cloud.push_back(point);
-    }
+    ConstructPointCloud(msg, point_cloud);
     ConstructLogProbGrid(point_cloud);
     log_prob_grid_initialized_ = true;
+    Vector2f estimated_loc = Vector2f(pose_history_.back().x(), pose_history_.back().y());
+    float estimated_angle = pose_history_.back().theta();
+    for (size_t i = 0; i < point_cloud.size(); i++) {
+      map_.push_back(Rotation2Df(estimated_angle) * point_cloud[i] + estimated_loc);
+    }
     return;
   }
   if (!apply_new_scan_) { //  && (!odom_initialized_ || log_prob_grid_initialized_
@@ -228,22 +257,16 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   pose_index_++;
 
   vector<Vector2f> point_cloud;
-  const float angle_increment = (angle_max - angle_min) / ranges.size();
-  // save the pointcloud in the robot's frame
-  // std::fill(point_cloud.begin(), point_cloud.end(), Vector2f(0, 0));
-  for (size_t i = 0; i < ranges.size(); i++) {
-      if (ranges[i] >= range_max || ranges[i] < range_min) {
-        continue;
-      }
-      const float angle = angle_min + i * angle_increment;
-      Vector2f point(ranges[i] * cos(angle) + 0.2, ranges[i] * sin(angle));
-      point_cloud.push_back(point);
-  }
+  ConstructPointCloud(msg, point_cloud);
+  printf("Pose Index: %d\n", pose_index_);
 
   // For loop to iterate over the last 5 poses
-  for (int i = odometry_pose_history_.size() - 1; (i >= 0 && i > (int) odometry_pose_history_.size() - 6); i--) {
+  assert(odometry_pose_history_.size() <= 5);
+  for (int i = 0; i < (int) odometry_pose_history_.size(); i++) {
     // Get old pose from pose_history_
-    Pose2 old_pose = pose_history_[i];
+    int pose_history_index = pose_index_ - 1 - odometry_pose_history_.size() + i;
+    printf("Pose History Index: %d\n", pose_history_index);
+    Pose2 old_pose = pose_history_[pose_history_index];
     Vector2f old_pose_loc = Vector2f(old_pose.x(), old_pose.y());
     float old_pose_angle = old_pose.theta();
     
@@ -275,10 +298,10 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
     //   //                          sigma_xi(2,0), sigma_xi(2,1), sigma_xi(2,2))
     // );
 
-    printf("Adding factor between %d and %d\n", i + 1, pose_index_);
-    graph_.add(BetweenFactor<Pose2>(i + 1, pose_index_, new_pose.between(old_pose), noise_model)); // new_pose.between(old_pose)
+    printf("Adding factor between %d and %d\n", pose_history_index + 1, pose_index_);
+    graph_.add(BetweenFactor<Pose2>(pose_history_index + 1, pose_index_, new_pose.between(old_pose), noise_model)); // new_pose.between(old_pose)
 
-    // If first estimate, add to initial estimate
+    // If from closest previous pose, add to initial estimate
     if (i == (int) odometry_pose_history_.size() - 1) {
       initial_estimate_.insert(pose_index_, new_pose);
     }
@@ -287,6 +310,14 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   odometry_pose_history_.push_back({prev_odom_loc_, prev_odom_angle_, 0.0});
   // Save log prob grid
   ConstructLogProbGrid(point_cloud);
+  // Keep only last 5 entries of odometry_pose_history_
+  if (odometry_pose_history_.size() > 5) {
+    odometry_pose_history_.erase(odometry_pose_history_.begin());
+  }
+  // Keep only last 5 entries of log_prob_grid_history_
+  if (log_prob_grid_history_.size() > 5) {
+    log_prob_grid_history_.erase(log_prob_grid_history_.begin());
+  }
 
   // for(int i = 1; i<= point_cloud_history_.size(); i++){
   //   // Get previous point cloud from point_cloud_history_
@@ -379,6 +410,8 @@ void SLAM::PredictMotionModel(
   const float old_pose_angle, 
   vector<Pose>& candidate_poses
 ) {
+  static CumulativeFunctionTimer function_timer_(__FUNCTION__);
+  CumulativeFunctionTimer::Invocation invoke(&function_timer_);
   Vector2f odom_loc_diff = prev_odom_loc_ - old_odom_loc;
   float loc_dist = odom_loc_diff.norm();
 

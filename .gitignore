@@ -4,3 +4,4 @@ bin
 lib
 data
 src/particle_filter_*
+*.bag

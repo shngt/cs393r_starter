@@ -30,6 +30,7 @@
 #include <gtsam/slam/PriorFactor.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/geometry/Pose2.h>
+#include "sensor_msgs/LaserScan.h"
 
 #ifndef SRC_SLAM_H_
 #define SRC_SLAM_H_
@@ -51,17 +52,17 @@ class SLAM {
   void RunCSM(const std::vector<Eigen::Vector2f>& point_cloud, const Eigen::Vector2f& old_loc, const float old_angle, const std::vector<std::vector<float>>& old_log_prob_grid,
     std::vector<Pose>& candidate_poses, Eigen::Matrix3f& covariance, gtsam::Pose2& new_pose);
 
+  void ConstructPointCloud(const sensor_msgs::LaserScan& msg, std::vector<Eigen::Vector2f>& point_cloud);
+
+  void DecimatePointCloud(const std::vector<Eigen::Vector2f>& point_cloud, std::vector<Eigen::Vector2f>& decimated_point_cloud);
+
   void ConstructLogProbGrid(const std::vector<Eigen::Vector2f>& point_cloud);
 
   // Run optimization with passed covariance matrix
   void OptimizeGraph(const std::vector<Eigen::Matrix3f>& covariances);
 
   // Observe a new laser scan.
-  void ObserveLaser(const std::vector<float>& ranges,
-                    float range_min,
-                    float range_max,
-                    float angle_min,
-                    float angle_max);
+  void ObserveLaser(const sensor_msgs::LaserScan& msg);
 
 //  std::vector<Pose> PredictMotionModel(float loc_diff, float angle_diff, Eigen::Vector2f current_pose_loc, float current_pose_angle);
   void PredictMotionModel(const Eigen::Vector2f& old_odom_loc, const float old_odom_angle, const Eigen::Vector2f& old_pose_loc, const float old_pose_angle, std::vector<slam::Pose>& candidate_poses);
