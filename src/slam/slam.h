@@ -57,7 +57,7 @@ class SLAM {
                     float angle_min,
                     float angle_max);
 
-  void PredictMotionModel(const Eigen::Vector2f& odom_loc, const float odom_angle, Eigen::Vector2f current_pose_loc, float current_pose_angle);
+  void PredictMotionModel(float loc_diff, float angle_diff, Eigen::Vector2f current_pose_loc, float current_pose_angle);
 
   // Observe new odometry-reported location.
   void ObserveOdometry(const Eigen::Vector2f& odom_loc,
@@ -69,7 +69,13 @@ class SLAM {
   // Get latest robot pose.
   void GetPose(Eigen::Vector2f* loc, float* angle) const;
 
- private:
+  // Flag to indicate if a new scan should be applied
+  bool apply_new_scan_;
+
+  // Transformed point cloud
+  std::vector<Eigen::Vector2f> transformed_point_cloud_;
+
+//  private:
   float K1_;
   float K2_;
   float K3_;
@@ -88,8 +94,8 @@ class SLAM {
   float loc_threshold_;
   float angle_threshold_;
 
-  // Flag to indicate if a new scan should be applied
-  bool apply_new_scan_;
+  // // Flag to indicate if a new scan should be applied
+  // bool apply_new_scan_;
 
   // Frequency of x, y, and theta sampling in the motion model calculations
   float x_freq_;
