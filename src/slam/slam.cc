@@ -256,9 +256,27 @@ void SLAM::ObserveLaser(const sensor_msgs::LaserScan& msg) {
   apply_new_scan_ = false;
   pose_index_++;
 
+  // Get last pose_history and add some random displacement (x,y,theta) to get the groundtruth
+  Pose2 old_pose = pose_history_.back() + Pose2(0.1, 0.1, 0.1);
+
+  // Make up a random 3x3 covariance matrix filled with random values (diagonal matrix with positive entries)
+  Matrix3f ran_covariance = Matrix3f::Random(3,3);
+
+  // Generate noise from gaussian with mean zero and random covariance matrix above
+  random_device rd{};
+  mt19937 gen{rd()};
+
+  Vector3f mean = Vector3f::Zero();
+  MultivariateNormal<float> mvn(mean, ran_covariance);
+  Vector3f noise = mvn.Sample(gen);
+
+  // Add noise to the ground truth to get noisy initial estimate
+  Pose2 noisy_pose = old_pose + Pose2(noise(0), noise(1), noise(2));
+  
+
   vector<Vector2f> point_cloud;
   ConstructPointCloud(msg, point_cloud);
-  printf("Pose Index: %d\n", pose_index_);
+  // printf("Pose Index: %d\n", pose_index_);
 
   // For loop to iterate over the last 5 poses
   assert(odometry_pose_history_.size() <= 5);
@@ -299,7 +317,9 @@ void SLAM::ObserveLaser(const sensor_msgs::LaserScan& msg) {
     // );
 
     printf("Adding factor between %d and %d\n", pose_history_index + 1, pose_index_);
-    graph_.add(BetweenFactor<Pose2>(pose_history_index + 1, pose_index_, new_pose.between(old_pose), noise_model)); // new_pose.between(old_pose)
+
+    // Then replace 'new_pose' with 'noisy_pose' in graph_.add(BetweenFactor<Pose2>(pose_history_index + 1, pose_index_, new_pose.between(old_pose), noise_model)); // new_pose.between(old_pose)
+    graph_.add(BetweenFactor<Pose2>(pose_history_index + 1, pose_index_, noisy_pose.between(old_pose), noise_model)); // new_pose.between(old_pose)
 
     // If from closest previous pose, add to initial estimate
     if (i == (int) odometry_pose_history_.size() - 1) {
@@ -358,6 +378,13 @@ void SLAM::ObserveLaser(const sensor_msgs::LaserScan& msg) {
     pose_history_.push_back(pose);
   }
   result_.print("Final Result:\n");
+
+  // Check if optimization 'result' is equal to the ground truth pose
+  // Print old_pose
+  printf("Old Pose: (%f, %f, %f)\n", old_pose.x(), old_pose.y(), old_pose.theta());
+  
+
+
   // if (pose_index_ == 5) exit(0);
   // Estimate pairwise non-succesive poses
   
