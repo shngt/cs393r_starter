@@ -77,6 +77,7 @@ slam::SLAM slam_;
 ros::Publisher visualization_publisher_;
 ros::Publisher localization_publisher_;
 VisualizationMsg vis_msg_;
+VisualizationMsg local_vis_msg_;
 sensor_msgs::LaserScan last_laser_msg_;
 
 void InitializeMsgs() {
@@ -85,6 +86,7 @@ void InitializeMsgs() {
   header.seq = 0;
 
   vis_msg_ = visualization::NewVisualizationMessage("map", "slam");
+  local_vis_msg_ = visualization::NewVisualizationMessage("base_link", "slam");
 }
 
 void PublishMap() {
@@ -120,10 +122,41 @@ void LaserCallback(const sensor_msgs::LaserScan& msg) {
   if (FLAGS_v > 0) {
     printf("Laser t=%f\n", msg.header.stamp.toSec());
   }
-  last_laser_msg_ = msg;
+  // static int color = 0x000000;
+  // if (slam_.apply_new_scan_) {
+  //   printf("Laser t=%f\n", msg.header.stamp.toSec());
+  //   vector<Vector2f> point_cloud;
+  //   const float angle_increment = (msg.angle_max - msg.angle_min) / msg.ranges.size();
+  //   // save the pointcloud in the robot's frame
+  //   // std::fill(point_cloud.begin(), point_cloud.end(), Vector2f(0, 0));
+  //   for (size_t i = 0; i < msg.ranges.size(); i += 10) {
+  //       if (msg.ranges[i] >= msg.range_max) {
+  //         continue;
+  //       }
+  //       const float angle = msg.angle_min + i * angle_increment;
+  //       Vector2f point(msg.ranges[i] * cos(angle) + 0.2, msg.ranges[i] * sin(angle));
+  //       point_cloud.push_back(point);
+  //   }
+  //   printf("color: %d\n", color);
+  //   for (const Vector2f& p : point_cloud) {
+  //     visualization::DrawPoint(p, color, local_vis_msg_);
+  //   }
+  //   color = color + 0x0000FF;
+  // }
+  // visualization_publisher_.publish(local_vis_msg_);
+  // last_laser_msg_ = msg;
   slam_.ObserveLaser(msg);
+  // printf("color in hex: %x\n", color);
+  // if (color == 0x0001FE) {
+  //   for (const Vector2f& p : slam_.transformed_point_cloud_) {
+  //     visualization::DrawPoint(p, 0xFF0000, local_vis_msg_);
+  //   }
+  //   visualization_publisher_.publish(local_vis_msg_);
+  //   color = 0x000000;
+  // }
   PublishMap();
   PublishPose();
+  // if (slam_.pose_index_ == 3) exit(0);
 }
 
 void OdometryCallback(const nav_msgs::Odometry& msg) {

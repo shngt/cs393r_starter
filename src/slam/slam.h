@@ -76,7 +76,7 @@ class SLAM {
   // Get latest robot pose.
   void GetPose(Eigen::Vector2f* loc, float* angle) const;
 
- private:
+//  private:
   float K1_;
   float K2_;
   float K3_;
@@ -88,8 +88,8 @@ class SLAM {
   bool odom_initialized_;
 
   // Estimated robot pose
-  Eigen::Vector2f estimated_loc_;
-  float estimated_angle_;
+  // Eigen::Vector2f estimated_loc_;
+  // float estimated_angle_;
 
   // Thresholds for adding new pose
   float loc_threshold_;
@@ -138,6 +138,8 @@ class SLAM {
 
   // Pose index for optimization
   int pose_index_;
+
+  std::vector<Eigen::Vector2f> transformed_point_cloud_;
 };
 }  // namespace slam
 
