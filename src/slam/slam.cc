@@ -143,7 +143,7 @@ void SLAM::RunCSM(
       }
     }
     // Add the motion model likelihood to the pose likelihood.
-    float pose_log_likelihood = pose_observation_log_likelihood + pose.log_likelihood;
+    float pose_log_likelihood = pose_observation_log_likelihood + pose.log_likelihood; //  0.00008 * 
     // printf("Pose: (%f, %f, %f), Log Likelihood: %f\n", pose.loc.x(), pose.loc.y(), pose.angle, pose_log_likelihood);
     pose.log_likelihood = pose_log_likelihood;
     // pose.log_likelihood += pose_observation_log_likelihood;
@@ -168,12 +168,17 @@ void SLAM::RunCSM(
   float s = 0.0; 
   for (auto pose : candidate_poses) {
     Vector3f xi(pose.loc.x(), pose.loc.y(), pose.angle);
+    // cout << "xi: " << xi << endl;
+    // cout << "xi * xi.transpose(): " << xi * xi.transpose() << endl;
+    // cout << "pose.log_likelihood: " << pose.log_likelihood << endl;
+    // cout << "exp(pose.log_likelihood): " << exp(pose.log_likelihood) << endl;
     K += xi * xi.transpose() * exp(pose.log_likelihood);
     u += xi * exp(pose.log_likelihood);
     s += exp(pose.log_likelihood);
     sigma_xi += (1/s)*K - (1/(pow(s,2)))*u*u.transpose();
   }
   covariance = sigma_xi;
+  // exit(0);
 }
 
 void SLAM::ConstructLogProbGrid(const vector<Vector2f>& point_cloud) {
@@ -193,7 +198,7 @@ void SLAM::ConstructLogProbGrid(const vector<Vector2f>& point_cloud) {
       for (int j = 0; j < (int) log_prob_grid[0].size(); j++) {
         float x_dist = (i - x) * log_prob_grid_resolution_;
         float y_dist = (j - y) * log_prob_grid_resolution_;
-        float log_prob = -1 * (x_dist * x_dist + y_dist * y_dist) / (2 * 0.02 * 0.02);
+        float log_prob = -1 * (x_dist * x_dist + y_dist * y_dist) / (2 * 0.1 * 0.1);
         log_prob_grid[i][j] = std::max(log_prob_grid[i][j], log_prob);
       }
     }
@@ -289,6 +294,13 @@ void SLAM::ObserveLaser(const sensor_msgs::LaserScan& msg) {
     Pose2 new_pose;
     RunCSM(point_cloud, old_pose_loc, old_pose_angle, old_log_prob_grid, candidate_poses, covariance, new_pose);
 
+    // // Hardcode covariance matrix for now
+    // covariance = Matrix3f::Identity();
+
+    // Print covariance matrix
+    // printf("Covariance Matrix: \n");
+    // cout << covariance << endl;
+
     // Add factor to pose graph
     // Solve for the joint solution over pose graph
     // Add odometry factors
@@ -357,7 +369,7 @@ void SLAM::ObserveLaser(const sensor_msgs::LaserScan& msg) {
     Pose2 pose = result_.at<Pose2>(i);
     pose_history_.push_back(pose);
   }
-  result_.print("Final Result:\n");
+  // result_.print("Final Result:\n");
   // if (pose_index_ == 5) exit(0);
   // Estimate pairwise non-succesive poses
   
