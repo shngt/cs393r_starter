@@ -199,7 +199,8 @@ void SLAM::ConstructLogProbGrid(const vector<Vector2f>& point_cloud) {
   // Construct the log probability grid from the point cloud.
   // Iterate over all points in the point cloud and update the log probability
   // grid.
-  vector<vector<double>> log_prob_grid(500, vector<double>(500, 0.0));
+  // Set to a small positive value to avoid probability collapse
+  vector<vector<double>> log_prob_grid(500, vector<double>(500, 0.05));
     // Iterate over all points in the point cloud and update the log probability grid
   // double max_val = -std::numeric_limits<double>::infinity();
   // double min_val = std::numeric_limits<double>::infinity();
@@ -209,29 +210,29 @@ void SLAM::ConstructLogProbGrid(const vector<Vector2f>& point_cloud) {
     Vector2f grid_point = (point - log_prob_grid_origin_) / log_prob_grid_resolution_;
     int x = grid_point.x(), y = grid_point.y();
     // Iterate over grid
-    for (int i = 0; i < (int) log_prob_grid.size(); i++) {
-      for (int j = 0; j < (int) log_prob_grid[0].size(); j++) {
-        double x_dist = (i - x) * log_prob_grid_resolution_;
-        double y_dist = (j - y) * log_prob_grid_resolution_;
-        double log_prob = exp(-1 * (x_dist * x_dist + y_dist * y_dist) / (2 * 0.01));
-        log_prob_grid[i][j] = std::max(log_prob_grid[i][j], log_prob);
-      }
-    }
-    // Iterate over small neighborhood around the point
-    // int max_offset = 10 * 0.02 / log_prob_grid_resolution_;
-    // for (int i = -max_offset; i <= max_offset; i++) {
-    //   for (int j = -max_offset; j <= max_offset; j++) {
-    //     int x_new = x + i, y_new = y + j;
-    //     if (x_new >= 0 && x_new < (int) log_prob_grid.size() && y_new >= 0 && y_new < (int) log_prob_grid[0].size()) {
-    //       printf("x_new: %d, y_new: %d\n", x_new, y_new);
-    //       double x_dist = i * log_prob_grid_resolution_;
-    //       double y_dist = j * log_prob_grid_resolution_;
-    //       double dist = sqrt(x_dist * x_dist + y_dist * y_dist);
-    //       double log_prob = exp(-dist * dist / (2 * 0.01));
-    //       log_prob_grid[x_new][y_new] = std::max(log_prob_grid[x_new][y_new], log_prob);
-    //     }
+    // for (int i = 0; i < (int) log_prob_grid.size(); i++) {
+    //   for (int j = 0; j < (int) log_prob_grid[0].size(); j++) {
+    //     double x_dist = (i - x) * log_prob_grid_resolution_;
+    //     double y_dist = (j - y) * log_prob_grid_resolution_;
+    //     double log_prob = exp(-1 * (x_dist * x_dist + y_dist * y_dist) / (2 * 0.01));
+    //     log_prob_grid[i][j] = std::max(log_prob_grid[i][j], log_prob);
     //   }
     // }
+    // Iterate over small neighborhood around the point
+    int max_offset = 10 * 0.02 / log_prob_grid_resolution_;
+    for (int i = -max_offset; i <= max_offset; i++) {
+      for (int j = -max_offset; j <= max_offset; j++) {
+        int x_new = x + i, y_new = y + j;
+        if (x_new >= 0 && x_new < (int) log_prob_grid.size() && y_new >= 0 && y_new < (int) log_prob_grid[0].size()) {
+          // printf("x_new: %d, y_new: %d\n", x_new, y_new);
+          double x_dist = i * log_prob_grid_resolution_;
+          double y_dist = j * log_prob_grid_resolution_;
+          double dist = sqrt(x_dist * x_dist + y_dist * y_dist);
+          double log_prob = exp(-dist * dist / (2 * 0.01));
+          log_prob_grid[x_new][y_new] = std::max(log_prob_grid[x_new][y_new], log_prob);
+        }
+      }
+    }
   }
   // for (int i = 0; i < (int) log_prob_grid.size(); i++) {
   //   for (int j = 0; j < (int) log_prob_grid[0].size(); j++) {
