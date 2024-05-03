@@ -184,9 +184,9 @@ void SLAM::RunCSM(
     // cout << "xi * xi.transpose(): " << xi * xi.transpose() << endl;
     // printf("exp(pose.log_likelihood): %f\n", exp(pose.log_likelihood));
     // printf("pose.log_likelihood: %f\n", pose.log_likelihood);
-    K += xi * xi.transpose() * exp(pose.log_likelihood);
-    u += xi * exp(pose.log_likelihood);
-    s += exp(pose.log_likelihood);
+    K += xi * xi.transpose() * pose.log_likelihood;
+    u += xi * pose.log_likelihood;
+    s += pose.log_likelihood;
     sigma_xi += (1/s)*K - (1/(pow(s,2)))*u*u.transpose();
   }
   covariance = sigma_xi;
@@ -209,29 +209,29 @@ void SLAM::ConstructLogProbGrid(const vector<Vector2f>& point_cloud) {
     Vector2f grid_point = (point - log_prob_grid_origin_) / log_prob_grid_resolution_;
     int x = grid_point.x(), y = grid_point.y();
     // Iterate over grid
-    // for (int i = 0; i < (int) log_prob_grid.size(); i++) {
-    //   for (int j = 0; j < (int) log_prob_grid[0].size(); j++) {
-    //     double x_dist = (i - x) * log_prob_grid_resolution_;
-    //     double y_dist = (j - y) * log_prob_grid_resolution_;
-    //     double log_prob = exp(-1 * (x_dist * x_dist + y_dist * y_dist) / (2 * 0.01));
-    //     log_prob_grid[i][j] = std::max(log_prob_grid[i][j], log_prob);
-    //   }
-    // }
-    // Iterate over small neighborhood around the point
-    int max_offset = 10 * 0.02 / log_prob_grid_resolution_;
-    for (int i = -max_offset; i <= max_offset; i++) {
-      for (int j = -max_offset; j <= max_offset; j++) {
-        int x_new = x + i, y_new = y + j;
-        if (x_new >= 0 && x_new < (int) log_prob_grid.size() && y_new >= 0 && y_new < (int) log_prob_grid[0].size()) {
-          printf("x_new: %d, y_new: %d\n", x_new, y_new);
-          double x_dist = i * log_prob_grid_resolution_;
-          double y_dist = j * log_prob_grid_resolution_;
-          double dist = sqrt(x_dist * x_dist + y_dist * y_dist);
-          double log_prob = exp(-dist * dist / (2 * 0.01));
-          log_prob_grid[x_new][y_new] = std::max(log_prob_grid[x_new][y_new], log_prob);
-        }
+    for (int i = 0; i < (int) log_prob_grid.size(); i++) {
+      for (int j = 0; j < (int) log_prob_grid[0].size(); j++) {
+        double x_dist = (i - x) * log_prob_grid_resolution_;
+        double y_dist = (j - y) * log_prob_grid_resolution_;
+        double log_prob = exp(-1 * (x_dist * x_dist + y_dist * y_dist) / (2 * 0.01));
+        log_prob_grid[i][j] = std::max(log_prob_grid[i][j], log_prob);
       }
     }
+    // Iterate over small neighborhood around the point
+    // int max_offset = 10 * 0.02 / log_prob_grid_resolution_;
+    // for (int i = -max_offset; i <= max_offset; i++) {
+    //   for (int j = -max_offset; j <= max_offset; j++) {
+    //     int x_new = x + i, y_new = y + j;
+    //     if (x_new >= 0 && x_new < (int) log_prob_grid.size() && y_new >= 0 && y_new < (int) log_prob_grid[0].size()) {
+    //       printf("x_new: %d, y_new: %d\n", x_new, y_new);
+    //       double x_dist = i * log_prob_grid_resolution_;
+    //       double y_dist = j * log_prob_grid_resolution_;
+    //       double dist = sqrt(x_dist * x_dist + y_dist * y_dist);
+    //       double log_prob = exp(-dist * dist / (2 * 0.01));
+    //       log_prob_grid[x_new][y_new] = std::max(log_prob_grid[x_new][y_new], log_prob);
+    //     }
+    //   }
+    // }
   }
   // for (int i = 0; i < (int) log_prob_grid.size(); i++) {
   //   for (int j = 0; j < (int) log_prob_grid[0].size(); j++) {
@@ -339,7 +339,7 @@ void SLAM::ObserveLaser(const sensor_msgs::LaserScan& msg) {
   ConstructPointCloud(msg, point_cloud);
   // printf("Pose Index: %d\n", pose_index_);
 
-  // For loop to iterate over the last 5 poses
+  // For loop to iterate over the last 3 poses
   assert(odometry_pose_history_.size() <= 3);
   for (int i = 0; i < (int) odometry_pose_history_.size(); i++) {
     // Get old pose from pose_history_
@@ -353,7 +353,6 @@ void SLAM::ObserveLaser(const sensor_msgs::LaserScan& msg) {
     Vector2f old_odom_loc = odometry_pose_history_[i].loc;
     double old_odom_angle = odometry_pose_history_[i].angle;
 
-    // Print statement to check if the odometry pose history are being correctly read
     // printf("Odometry Pose: (%f, %f, %f)\n", old_odom_loc.x(), old_odom_loc.y(), old_odom_angle);
 
     // Get list of candidate poses with likelihood
@@ -396,11 +395,11 @@ void SLAM::ObserveLaser(const sensor_msgs::LaserScan& msg) {
   odometry_pose_history_.push_back({prev_odom_loc_, prev_odom_angle_, 0.0});
   // Save log prob grid
   ConstructLogProbGrid(point_cloud);
-  // Keep only last 5 entries of odometry_pose_history_
+  // Keep only last 3 entries of odometry_pose_history_
   if (odometry_pose_history_.size() > 3) {
     odometry_pose_history_.erase(odometry_pose_history_.begin());
   }
-  // Keep only last 5 entries of log_prob_grid_history_
+  // Keep only last 3 entries of log_prob_grid_history_
   if (log_prob_grid_history_.size() > 3) {
     log_prob_grid_history_.erase(log_prob_grid_history_.begin());
   }
