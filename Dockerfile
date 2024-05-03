@@ -6,7 +6,7 @@ RUN apt-get update && \
                        libgoogle-glog-dev liblua5.1-0-dev \
                        libboost-all-dev libqt5websockets5-dev \
                        python-is-python3 libeigen3-dev software-properties-common \
-                       sudo tmux
+                       libopencv-dev sudo tmux
                        
 
 RUN add-apt-repository ppa:borglab/gtsam-release-4.0 && \

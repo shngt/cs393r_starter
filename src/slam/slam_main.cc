@@ -144,7 +144,7 @@ void LaserCallback(const sensor_msgs::LaserScan& msg) {
   //   color = color + 0x0000FF;
   // }
   // visualization_publisher_.publish(local_vis_msg_);
-  // last_laser_msg_ = msg;
+  last_laser_msg_ = msg;
   slam_.ObserveLaser(msg);
   // printf("color in hex: %x\n", color);
   // if (color == 0x0001FE) {
@@ -152,7 +152,7 @@ void LaserCallback(const sensor_msgs::LaserScan& msg) {
   //     visualization::DrawPoint(p, 0xFF0000, local_vis_msg_);
   //   }
   //   visualization_publisher_.publish(local_vis_msg_);
-  //   color = 0x000000;
+  //   // color = 0x000000;
   // }
   PublishMap();
   PublishPose();

@@ -40,15 +40,17 @@ ADD_LIBRARY(shared_library
 ADD_SUBDIRECTORY(src/shared)
 INCLUDE_DIRECTORIES(src/shared)
 INCLUDE_DIRECTORIES(src)
-list(APPEND CMAKE_PREFIX_PATH "./gtsam/build")
-set (GTSAM_DIR "./gtsam/build")
+
 find_package(GTSAM REQUIRED)
 INCLUDE_DIRECTORIES(${GTSAM_INCLUDE_DIR})
+
+# find_package(OpenCV REQUIRED)
+# include_directories(${OpenCV_INCLUDE_DIRS})
 
 ROSBUILD_ADD_EXECUTABLE(slam
                         src/slam/slam_main.cc
                         src/slam/slam.cc)
-TARGET_LINK_LIBRARIES(slam shared_library gtsam ${libs})
+TARGET_LINK_LIBRARIES(slam shared_library gtsam ${libs}) #  ${OpenCV_LIBS}
 
 
 ROSBUILD_ADD_EXECUTABLE(particle_filter

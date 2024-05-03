@@ -39,8 +39,8 @@ namespace slam {
 
 struct Pose {
   Eigen::Vector2f loc;
-  float angle;
-  float log_likelihood;
+  double angle;
+  double log_likelihood;
 };
 
 class SLAM {
@@ -49,7 +49,7 @@ class SLAM {
   SLAM();
 
   // Run CSM on the given point cloud
-  void RunCSM(const std::vector<Eigen::Vector2f>& point_cloud, const Eigen::Vector2f& old_loc, const float old_angle, const std::vector<std::vector<float>>& old_log_prob_grid,
+  void RunCSM(const std::vector<Eigen::Vector2f>& point_cloud, const Eigen::Vector2f& old_loc, const double old_angle, const std::vector<std::vector<double>>& old_log_prob_grid,
     std::vector<Pose>& candidate_poses, Eigen::Matrix3f& covariance, gtsam::Pose2& new_pose);
 
   void ConstructPointCloud(const sensor_msgs::LaserScan& msg, std::vector<Eigen::Vector2f>& point_cloud);
@@ -64,11 +64,11 @@ class SLAM {
   // Observe a new laser scan.
   void ObserveLaser(const sensor_msgs::LaserScan& msg);
 
-//  std::vector<Pose> PredictMotionModel(float loc_diff, float angle_diff, Eigen::Vector2f current_pose_loc, float current_pose_angle);
-  void PredictMotionModel(const Eigen::Vector2f& old_odom_loc, const float old_odom_angle, const Eigen::Vector2f& old_pose_loc, const float old_pose_angle, std::vector<slam::Pose>& candidate_poses);
+//  std::vector<Pose> PredictMotionModel(double loc_diff, double angle_diff, Eigen::Vector2f current_pose_loc, double current_pose_angle);
+  void PredictMotionModel(const Eigen::Vector2f& old_odom_loc, const double old_odom_angle, const Eigen::Vector2f& old_pose_loc, const double old_pose_angle, std::vector<slam::Pose>& candidate_poses);
   // Observe new odometry-reported location.
   void ObserveOdometry(const Eigen::Vector2f& odom_loc,
-                       const float odom_angle);
+                       const double odom_angle);
 
   // Get latest map.
   std::vector<Eigen::Vector2f> GetMap();
@@ -77,35 +77,35 @@ class SLAM {
   void GetPose(Eigen::Vector2f* loc, float* angle) const;
 
 //  private:
-  float K1_;
-  float K2_;
-  float K3_;
-  float K4_;
+  double K1_;
+  double K2_;
+  double K3_;
+  double K4_;
 
   // Previous odometry-reported locations.
   Eigen::Vector2f prev_odom_loc_;
-  float prev_odom_angle_;
+  double prev_odom_angle_;
   bool odom_initialized_;
 
   // Estimated robot pose
   // Eigen::Vector2f estimated_loc_;
-  // float estimated_angle_;
+  // double estimated_angle_;
 
   // Thresholds for adding new pose
-  float loc_threshold_;
-  float angle_threshold_;
+  double loc_threshold_;
+  double angle_threshold_;
 
   // Flag to indicate if a new scan should be applied
   bool apply_new_scan_;
 
   // Frequency of x, y, and theta sampling in the motion model calculations
-  float x_freq_;
-  float y_freq_;
-  float theta_freq_;
+  double x_freq_;
+  double y_freq_;
+  double theta_freq_;
 
   // Log probability grid for CSM
-  // std::vector<std::vector<float>> log_prob_grid_;
-  float log_prob_grid_resolution_;
+  // std::vector<std::vector<double>> log_prob_grid_;
+  double log_prob_grid_resolution_;
   Eigen::Vector2f log_prob_grid_origin_;
   bool log_prob_grid_initialized_;
 
@@ -119,7 +119,7 @@ class SLAM {
   gtsam::NonlinearFactorGraph graph_;
 
   // History of log_prob_grid
-  std::vector<std::vector<std::vector<float>>> log_prob_grid_history_;
+  std::vector<std::vector<std::vector<double>>> log_prob_grid_history_;
   
   // History of odometry-reported poses
   std::vector<Pose> odometry_pose_history_;
