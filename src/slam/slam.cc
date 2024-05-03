@@ -74,7 +74,7 @@ SLAM::SLAM() :
     // estimated_loc_(0, 0),
     // estimated_angle_(0),
     loc_threshold_(0.3),
-    angle_threshold_(M_PI / 12),
+    angle_threshold_(M_PI / 9),
     apply_new_scan_(false),
     x_freq_(11.0),
     y_freq_(11.0),
